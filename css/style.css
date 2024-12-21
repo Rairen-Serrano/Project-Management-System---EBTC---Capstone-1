@@ -4,27 +4,396 @@
 }
   
 body,html, :root {
-    min-height: 100%;
+    min-height: 100vh;
     background-color: #eae7e6;
     padding: 0;
     margin: 0;
     font-family: Poppins, sans-serif;
     font-size: 1em;
+    display: flex;
+    flex-direction: column;
 }
 
 /*
-
     SHORCUT KEY:
         selected line + SHIFT + TAB - To backspace multiple lines
-
-
-    Color Pallete
-        > Shades of GREEN (1 being the lightest)
-    #DAF1DE	- 1
-    #8EB69B	- 2
-    #00A36C - 3
-    #235347 - 4
-    #163832 - 5
-    #0B2B26 - 6
-    #051F20 - 7
 */
+
+.card {
+    border-radius: 10px;
+    border: none;
+    background-color: white;
+}
+
+.card-body {
+    border-radius: 10px;
+}
+
+.btn-primary {
+    background-color: #00A36C !important;
+    border-color: #00A36C !important;
+}
+
+.btn-primary:hover {
+    background-color: #235347 !important;
+    border-color: #235347 !important;
+}
+
+.form-control:focus {
+    border-color: #8EB69B;
+    box-shadow: 0 0 0 0.25rem rgba(142, 182, 155, 0.25);
+}
+
+/* Login page specific styles */
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+}
+
+/* Header Styles */
+.login-header {
+    background-color: #235347;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 0;
+    width: 100%;
+}
+
+/* Update container padding */
+.login-header .container {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.login-header .container .py-3 {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+}
+
+/* Separate class for header logo */
+.header-logo {
+    height: 100px;
+    width: auto;
+}
+
+.header-title {
+    color: white;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+/* Dashboard Styles */
+.activity-feed {
+    padding: 15px;
+}
+
+.activity-item {
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-item i {
+    margin-right: 10px;
+}
+
+.activity-item small {
+    display: block;
+    margin-left: 14px;
+}
+
+/* Card hover effects */
+.card {
+    transition: transform 0.2s;
+}
+
+/* Progress bar styling */
+.progress {
+    height: 10px;
+    margin-top: 5px;
+}
+
+/* Navbar customization */
+.navbar {
+    background-color: #235347 !important;
+}
+
+.navbar-brand img {
+    filter: brightness(0) invert(1);
+}
+
+/* Stats cards */
+.card.bg-primary {
+    background-color: #00A36C !important;
+    border: none;
+}
+
+.card.bg-success {
+    background-color: #235347 !important;
+    border: none;
+}
+
+.card.bg-warning {
+    background-color: #8EB69B !important;
+    border: none;
+}
+
+.card.bg-info {
+    background-color: #163832 !important;
+    border: none;
+}
+
+/* Add these to your header styles section */
+.login-header a {
+    color: white;
+}
+
+.login-header a:hover {
+    color: #8EB69B;
+    transition: color 0.3s ease;
+}
+
+/* Update the admin login button for better contrast */
+.login-header .btn-outline-secondary {
+    color: white;
+    border-color: white;
+}
+
+.login-header .btn-outline-secondary:hover {
+    background-color: white;
+    color: #235347;
+}
+
+/* Footer Styles */
+.footer {
+    background-color: #235347;
+    color: white;
+    padding: 1.5rem 0;
+    width: 100%;
+}
+
+.footer p {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+/* Ensure footer stays at bottom */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.container-fluid {
+    flex: 1 0 auto;
+}
+
+.footer {
+    flex-shrink: 0;
+}
+
+/* Registration Form Styles */
+.form-floating {
+    position: relative;
+}
+
+.form-floating > label {
+    padding-left: 1.5rem;
+}
+
+.form-floating > .form-control {
+    height: calc(3.5rem + 2px);
+    line-height: 1.25;
+}
+
+.form-floating > .form-control:focus {
+    border-color: #00A36C;
+    box-shadow: 0 0 0 0.25rem rgba(0, 163, 108, 0.25);
+}
+
+.password-requirements {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+
+.password-requirements ul {
+    margin-bottom: 0;
+}
+
+.password-requirements li {
+    margin-bottom: 0.25rem;
+}
+
+/* Update card styles for registration */
+.card {
+    border: none;
+    border-radius: 15px;
+}
+
+.card-body {
+    border-radius: 15px;
+}
+
+/* Button hover effect */
+.btn-primary {
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: #235347 !important;
+    border-color: #235347 !important;
+}
+
+/* Add this to your CSS */
+.container {
+    margin-top: 3rem;
+    margin-bottom: 3rem;
+}
+
+/* Or if you want it specific to the registration page */
+.container:has(.card) {
+    margin-top: 3rem;
+    margin-bottom: 3rem;
+}
+
+/* Password Strength Indicator */
+.password-strength .progress {
+    margin-bottom: 5px;
+}
+
+.password-strength small {
+    font-weight: 500;
+}
+
+/* Strength Colors */
+.bg-very-weak {
+    background-color: #dc3545 !important;
+}
+
+.bg-weak {
+    background-color: #ffc107 !important;
+}
+
+.bg-moderate {
+    background-color: #0dcaf0 !important;
+}
+
+.bg-good {
+    background-color: #198754 !important;
+}
+
+.bg-strong {
+    background-color: #00A36C !important;
+}
+
+.text-very-weak {
+    color: #dc3545 !important;
+}
+
+.text-weak {
+    color: #ffc107 !important;
+}
+
+.text-moderate {
+    color: #0dcaf0 !important;
+}
+
+.text-good {
+    color: #198754 !important;
+}
+
+.text-strong {
+    color: #00A36C !important;
+}
+
+/* Add transition for smooth progress bar updates */
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
+/* Password match indicator */
+.password-match {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.password-match i {
+    font-size: 1rem;
+}
+
+/* Password toggle button styles */
+.password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 13px;
+    z-index: 5;
+    border: none;
+    background: none;
+    color: #000;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    pointer-events: auto;
+}
+
+.password-toggle:hover {
+    color: #00A36C;
+}
+
+.password-toggle:focus {
+    box-shadow: none;
+    outline: none;
+}
+
+/* Adjust password input padding to accommodate the toggle button */
+input[type="password"] {
+    padding-right: 45px !important;
+}
+
+/* Update password strength and match indicators positioning */
+.password-strength,
+.password-match {
+    position: static !important;
+    margin-top: 0.5rem !important;
+    z-index: 4;
+}
+
+/* Ensure password input maintains proper spacing */
+.form-floating > input[type="password"] {
+    padding-right: 45px !important;
+}
+
+/* Adjust container spacing for validation messages */
+.form-floating {
+    margin-bottom: 0;
+}
+
+/* Adjust the form-floating position */
+.form-floating {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Ensure the input container maintains proper height */
+.form-floating > .form-control {
+    height: calc(3.5rem + 2px);
+    line-height: 1.25;
+    position: relative;
+}
+
+/* Keep validation messages below the input */
+.password-strength,
+.password-match {
+    order: 2;
+    margin-top: 0.5rem !important;
+}

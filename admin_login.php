@@ -1,48 +1,26 @@
 <?php
 session_start();
-
-// Include database connection
 require_once 'dbconnect.php';
 
-// Check if user is already logged in
-if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
-    header('Location: dashboard.php');
-    exit;
-}
-
-// Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = $_POST['email'] ?? '';
     $password = $_POST['password'] ?? '';
     
     try {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND status = 'active'");
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND role = 'admin' AND status = 'active'");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($user && password_verify($password, $user['password'])) {
             $_SESSION['logged_in'] = true;
+            $_SESSION['is_admin'] = true;
             $_SESSION['user_id'] = $user['user_id'];
             $_SESSION['name'] = $user['name'];
             $_SESSION['role'] = $user['role'];
-            
-            // Redirect based on role
-            switch($user['role']) {
-                case 'admin':
-                    header('Location: admin/dashboard.php');
-                    break;
-                case 'engineer':
-                    header('Location: engineer/dashboard.php');
-                    break;
-                case 'project_manager':
-                    header('Location: manager/dashboard.php');
-                    break;
-                default:
-                    header('Location: client/dashboard.php');
-            }
+            header('Location: admin/dashboard.php');
             exit;
         } else {
-            $error_message = 'Invalid email or password';
+            $error_message = 'Invalid admin credentials';
         }
     } catch(PDOException $e) {
         $error_message = 'Login error: ' . $e->getMessage();
@@ -53,8 +31,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!--CSS link here-->
     <link rel="stylesheet" href="css/style.css">
@@ -76,10 +52,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
 
-    <title>Landing Page | Login Page</title>
-    
+    <title>Admin Login | EBTC PMS</title>
 </head>
-<body id="loginPage">
+<body id="adminLoginPage">
     <?php include 'header.php'; ?>
     
     <div class="container my-5">
@@ -87,22 +62,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="col-md-8 col-lg-5">
                 <div class="card shadow">
                     <div class="card-body p-5">
-                        <h2 class="text-center mb-4">Welcome Back!</h2>
+                        <div class="text-center mb-4">
+                            <i class="fas fa-user-shield fa-3x text-primary mb-3"></i>
+                            <h2 class="mb-0">Admin Login</h2>
+                        </div>
                         
                         <?php if (isset($error_message)): ?>
                             <div class="alert alert-danger">
                                 <i class="fas fa-exclamation-circle me-2"></i>
                                 <?php echo htmlspecialchars($error_message); ?>
-                            </div>
-                        <?php endif; ?>
-
-                        <?php if (isset($_SESSION['success_message'])): ?>
-                            <div class="alert alert-success">
-                                <i class="fas fa-check-circle me-2"></i>
-                                <?php 
-                                echo htmlspecialchars($_SESSION['success_message']);
-                                unset($_SESSION['success_message']);
-                                ?>
                             </div>
                         <?php endif; ?>
 
@@ -116,15 +84,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
                                 <label for="password"><i class="fas fa-lock me-2"></i>Password</label>
                             </div>
-
-                            <div class="d-flex justify-content-end mb-4">
-                                <a href="forgot_password.php" class="text-decoration-none small">Forgot Password?</a>
-                            </div>
                             
-                            <button type="submit" class="btn btn-primary w-100 py-3 mb-4">Login</button>
-
+                            <button type="submit" class="btn btn-primary w-100 py-3 mb-4">Login as Admin</button>
+                            
                             <div class="text-center">
-                                <p class="mb-0">Don't have an account? <a href="register.php" class="text-decoration-none">Create one</a></p>
+                                <a href="index.php" class="text-decoration-none">
+                                    <i class="fas fa-arrow-left me-2"></i>Back to User Login
+                                </a>
                             </div>
                         </form>
                     </div>
@@ -135,4 +101,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <?php include 'footer.php'; ?>
 </body>
-</html>
+</html> 

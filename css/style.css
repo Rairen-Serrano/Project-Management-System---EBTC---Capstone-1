@@ -1,0 +1,30 @@
+/* Universal Style */
+* {
+    font-family: 'Poppins', sans-serif;
+}
+  
+body,html, :root {
+    min-height: 100%;
+    background-color: #eae7e6;
+    padding: 0;
+    margin: 0;
+    font-family: Poppins, sans-serif;
+    font-size: 1em;
+}
+
+/*
+
+    SHORCUT KEY:
+        selected line + SHIFT + TAB - To backspace multiple lines
+
+
+    Color Pallete
+        > Shades of GREEN (1 being the lightest)
+    #DAF1DE	- 1
+    #8EB69B	- 2
+    #00A36C - 3
+    #235347 - 4
+    #163832 - 5
+    #0B2B26 - 6
+    #051F20 - 7
+*/

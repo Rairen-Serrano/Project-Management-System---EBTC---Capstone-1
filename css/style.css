@@ -1,62 +1,151 @@
-/* Universal Style */
-* {
-    font-family: 'Poppins', sans-serif;
-}
-  
-body,html, :root {
-    min-height: 100vh;
-    background-color: #eae7e6;
-    padding: 0;
-    margin: 0;
-    font-family: Poppins, sans-serif;
-    font-size: 1em;
+/* Client Dashboard Sidebar Styles */
+.client-dashboard-wrapper {
     display: flex;
-    flex-direction: column;
-}
-
-/*
-    SHORCUT KEY:
-        selected line + SHIFT + TAB - To backspace multiple lines
-*/
-
-.card {
-    border-radius: 10px;
-    border: none;
-    background-color: white;
-}
-
-.card-body {
-    border-radius: 10px;
-}
-
-.btn-primary {
-    background-color: #00A36C !important;
-    border-color: #00A36C !important;
-}
-
-.btn-primary:hover {
-    background-color: #235347 !important;
-    border-color: #235347 !important;
-}
-
-.form-control:focus {
-    border-color: #8EB69B;
-    box-shadow: 0 0 0 0.25rem rgba(142, 182, 155, 0.25);
-}
-
-/* Login page specific styles */
-.login-page {
     min-height: 100vh;
+    padding-top: 80px; /* Height of the header */
+}
+
+.client-sidebar {
+    width: 250px;
+    background: #235347;
+    color: white;
+    position: fixed;
+    height: calc(100vh - 80px); /* Subtract header height */
+    left: 0;
+    top: 80px; /* Start below header */
+    z-index: 999;
+    transition: all 0.3s ease;
+    overflow-y: auto;
+}
+
+.client-sidebar-header {
+    display: none; /* Hide the duplicate logo since it's in the header */
+}
+
+.client-sidebar-menu {
+    padding: 20px 0;
+}
+
+.client-sidebar-menu a {
+    padding: 12px 20px;
+    color: white;
     display: flex;
     align-items: center;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.client-sidebar-menu a:hover,
+.client-sidebar-menu a.active {
+    background: #00A36C;
+    border-left: 4px solid white;
+}
+
+.client-sidebar-menu a i {
+    margin-right: 10px;
+    width: 20px;
+    text-align: center;
+}
+
+.client-main-content {
+    flex: 1;
+    margin-left: 250px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    min-height: calc(100vh - 80px);
+}
+
+.client-user-info {
+    padding: 20px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.client-user-info img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    margin-bottom: 10px;
+}
+
+.client-user-info h6 {
+    margin: 0;
+    color: white;
+}
+
+.client-user-info small {
+    color: rgba(255,255,255,0.7);
+}
+
+/* Responsive styles for client dashboard */
+@media (max-width: 768px) {
+    .client-header {
+        height: 60px;
+    }
+
+    .client-header .navbar {
+        height: 60px;
+    }
+
+    .client-header .header-logo {
+        height: 40px;
+    }
+
+    .client-dashboard-wrapper {
+        padding-top: 60px;
+    }
+
+    .client-sidebar {
+        margin-left: -250px;
+        top: 60px;
+        height: calc(100vh - 60px);
+    }
+
+    .client-sidebar.active {
+        margin-left: 0;
+    }
+
+    .client-main-content {
+        margin-left: 0;
+    }
+
+    .client-main-content.active {
+        margin-left: 250px;
+    }
+}
+
+/* Activity Feed Styles */
+.activity-feed {
+    padding: 0;
+}
+
+.activity-item {
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-item i {
+    margin-right: 10px;
+}
+
+.activity-item small {
+    display: block;
+    margin-left: 24px;
 }
 
 /* Header Styles */
 .login-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
     background-color: #235347;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 0;
-    width: 100%;
 }
 
 /* Update container padding */
@@ -80,70 +169,6 @@ body,html, :root {
     color: white;
     font-size: 1.3rem;
     font-weight: 600;
-}
-
-/* Dashboard Styles */
-.activity-feed {
-    padding: 15px;
-}
-
-.activity-item {
-    padding: 10px 0;
-    border-bottom: 1px solid #eee;
-}
-
-.activity-item:last-child {
-    border-bottom: none;
-}
-
-.activity-item i {
-    margin-right: 10px;
-}
-
-.activity-item small {
-    display: block;
-    margin-left: 14px;
-}
-
-/* Card hover effects */
-.card {
-    transition: transform 0.2s;
-}
-
-/* Progress bar styling */
-.progress {
-    height: 10px;
-    margin-top: 5px;
-}
-
-/* Navbar customization */
-.navbar {
-    background-color: #235347 !important;
-}
-
-.navbar-brand img {
-    filter: brightness(0) invert(1);
-}
-
-/* Stats cards */
-.card.bg-primary {
-    background-color: #00A36C !important;
-    border: none;
-}
-
-.card.bg-success {
-    background-color: #235347 !important;
-    border: none;
-}
-
-.card.bg-warning {
-    background-color: #8EB69B !important;
-    border: none;
-}
-
-.card.bg-info {
-    background-color: #163832 !important;
-    border: none;
 }
 
 /* Add these to your header styles section */
@@ -180,6 +205,40 @@ body,html, :root {
     opacity: 0.9;
 }
 
+.footer h5 {
+    color: white;
+    margin-bottom: 1.2rem;
+    font-weight: 600;
+}
+
+.footer ul li {
+    margin-bottom: 0.5rem;
+}
+
+.footer ul li a {
+    color: white;
+    text-decoration: none;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.footer ul li a:hover {
+    opacity: 1;
+    color: #8EB69B;
+}
+
+.footer .social-links a {
+    color: white;
+    font-size: 1.2rem;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.footer .social-links a:hover {
+    opacity: 1;
+    color: #8EB69B;
+}
+
 /* Ensure footer stays at bottom */
 body {
     min-height: 100vh;
@@ -195,205 +254,288 @@ body {
     flex-shrink: 0;
 }
 
-/* Registration Form Styles */
-.form-floating {
-    position: relative;
+/* Add a divider style for the footer */
+.footer hr {
+    border-color: rgba(255, 255, 255, 0.1);
+    margin: 2rem 0 1rem;
 }
 
-.form-floating > label {
-    padding-left: 1.5rem;
+/* Update/Add these navbar styles */
+.navbar {
+    background-color: #235347;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 0;
 }
 
-.form-floating > .form-control {
-    height: calc(3.5rem + 2px);
-    line-height: 1.25;
+.navbar-brand img {
+    height: 120px;
+    padding: 10px 0;
 }
 
-.form-floating > .form-control:focus {
-    border-color: #00A36C;
-    box-shadow: 0 0 0 0.25rem rgba(0, 163, 108, 0.25);
-}
-
-.password-requirements {
-    background-color: #f8f9fa;
+.navbar-dark .navbar-nav .nav-link {
+    color: rgba(255,255,255,0.8);
     padding: 1rem;
-    border-radius: 0.5rem;
+    transition: color 0.3s ease;
 }
 
-.password-requirements ul {
-    margin-bottom: 0;
+.navbar-dark .navbar-nav .nav-link:hover {
+    color: #8EB69B;
 }
 
-.password-requirements li {
-    margin-bottom: 0.25rem;
-}
-
-/* Update card styles for registration */
-.card {
+.navbar .dropdown-menu {
+    background-color: white;
     border: none;
-    border-radius: 15px;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.1);
 }
 
-.card-body {
-    border-radius: 15px;
-}
-
-/* Button hover effect */
-.btn-primary {
+.navbar .dropdown-item {
+    padding: 0.7rem 1.5rem;
     transition: all 0.3s ease;
 }
 
-.btn-primary:hover {
-    background-color: #235347 !important;
-    border-color: #235347 !important;
-}
-
-/* Add this to your CSS */
-.container {
-    margin-top: 3rem;
-    margin-bottom: 3rem;
-}
-
-/* Or if you want it specific to the registration page */
-.container:has(.card) {
-    margin-top: 3rem;
-    margin-bottom: 3rem;
-}
-
-/* Password Strength Indicator */
-.password-strength .progress {
-    margin-bottom: 5px;
-}
-
-.password-strength small {
-    font-weight: 500;
-}
-
-/* Strength Colors */
-.bg-very-weak {
-    background-color: #dc3545 !important;
-}
-
-.bg-weak {
-    background-color: #ffc107 !important;
-}
-
-.bg-moderate {
-    background-color: #0dcaf0 !important;
-}
-
-.bg-good {
-    background-color: #198754 !important;
-}
-
-.bg-strong {
-    background-color: #00A36C !important;
-}
-
-.text-very-weak {
-    color: #dc3545 !important;
-}
-
-.text-weak {
-    color: #ffc107 !important;
-}
-
-.text-moderate {
-    color: #0dcaf0 !important;
-}
-
-.text-good {
-    color: #198754 !important;
-}
-
-.text-strong {
-    color: #00A36C !important;
-}
-
-/* Add transition for smooth progress bar updates */
-.progress-bar {
-    transition: width 0.3s ease;
-}
-
-/* Password match indicator */
-.password-match {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.password-match i {
-    font-size: 1rem;
-}
-
-/* Password toggle button styles */
-.password-toggle {
-    position: absolute;
-    right: 12px;
-    top: 13px;
-    z-index: 5;
-    border: none;
-    background: none;
-    color: #000;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    pointer-events: auto;
-}
-
-.password-toggle:hover {
+.navbar .dropdown-item:hover {
+    background-color: #f8fff9;
     color: #00A36C;
 }
 
-.password-toggle:focus {
-    box-shadow: none;
-    outline: none;
+.navbar .btn-outline-light {
+    border-width: 2px;
 }
 
-/* Adjust password input padding to accommodate the toggle button */
-input[type="password"] {
-    padding-right: 45px !important;
+.navbar .btn-outline-light:hover {
+    background-color: white;
+    color: #235347;
 }
 
-/* Update password strength and match indicators positioning */
-.password-strength,
-.password-match {
-    position: static !important;
-    margin-top: 0.5rem !important;
-    z-index: 4;
-}
-
-/* Ensure password input maintains proper spacing */
-.form-floating > input[type="password"] {
-    padding-right: 45px !important;
-}
-
-/* Adjust container spacing for validation messages */
-.form-floating {
-    margin-bottom: 0;
-}
-
-/* Adjust the form-floating position */
-.form-floating {
+/* Remove any fixed-top related styles */
+.navbar.fixed-top {
     position: relative;
+}
+
+/* Responsive adjustments */
+@media (max-width: 991px) {
+    .navbar-collapse {
+        padding: 1rem 0;
+    }
+    
+    .navbar-nav {
+        padding: 1rem 0;
+        border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .navbar .btn-outline-light {
+        margin: 0.5rem 0;
+    }
+}
+
+/* Hero Section Styles */
+.hero {
+    background-color: #f8f9fa;
+    min-height: 100vh;
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    padding: 120px 0;
 }
 
-/* Ensure the input container maintains proper height */
-.form-floating > .form-control {
-    height: calc(3.5rem + 2px);
-    line-height: 1.25;
+.hero h1 {
+    color: #235347;
+}
+
+.hero .btn-lg {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+}
+
+/* Services Section Styles */
+.service-card {
+    transition: transform 0.3s ease;
+    border: none;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
+}
+
+.service-card:hover {
+    transform: translateY(-5px);
+}
+
+.service-icon {
+    font-size: 3rem;
+    color: #00A36C;
+}
+
+.service-card .card-title {
+    color: #235347;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.service-card ul li {
+    margin-bottom: 0.5rem;
+    color: #666;
+}
+
+.service-card ul li:before {
+    content: "•";
+    color: #00A36C;
+    font-weight: bold;
+    display: inline-block;
+    width: 1em;
+    margin-left: -1em;
+}
+
+/* About Section Styles */
+.about-section {
+    background-color: #f8f9fa;
+    padding: 80px 0;
+}
+
+.about-section h2 {
+    color: #235347;
+    margin-bottom: 2rem;
+}
+
+.about-section .check-item {
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+.about-section .check-item i {
+    color: #00A36C;
+    margin-right: 10px;
+}
+
+/* Contact Section Styles */
+.contact-section {
+    padding: 80px 0;
+}
+
+.contact-section h2 {
+    color: #235347;
+    margin-bottom: 2rem;
+}
+
+/* AOS Animation Styles */
+[data-aos] {
+    pointer-events: none;
+}
+
+[data-aos].aos-animate {
+    pointer-events: auto;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    .hero {
+        padding: 80px 0;
+        text-align: center;
+    }
+
+    .hero img {
+        margin-top: 2rem;
+    }
+
+    .service-card {
+        margin-bottom: 2rem;
+    }
+}
+
+/* Section Spacing */
+section {
+    padding: 100px 0;
+}
+
+section h2 {
+    margin-bottom: 3rem;
+}
+
+/* Image Styles */
+.img-fluid {
+    border-radius: 10px;
+}
+
+/* Button Hover Effects */
+.btn {
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Password Toggle Button Styles */
+.form-floating {
     position: relative;
 }
 
-/* Keep validation messages below the input */
-.password-strength,
-.password-match {
-    order: 2;
-    margin-top: 0.5rem !important;
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+.password-toggle:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+/* Adjust input padding to prevent text overlap with icon */
+.form-floating input[type="password"] {
+    padding-right: 40px;
+}
+
+/* Remove default button styles */
+.btn-link.password-toggle {
+    text-decoration: none;
+}
+
+.btn-link.password-toggle:hover {
+    text-decoration: none;
+    transform: translateY(-50%);
+}
+
+/* Client Header Styles */
+.client-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background-color: #235347;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    height: 80px;
+}
+
+.client-header .navbar {
+    height: 80px;
+    padding: 0;
+    background-color: transparent;
+}
+
+.client-header .header-logo {
+    height: 60px;
+    width: auto;
+    padding: 0;
+}
+
+.client-header .nav-link {
+    color: white !important;
+    padding: 0.5rem 1rem;
+}
+
+.client-header .nav-link:hover {
+    color: #8EB69B !important;
+}
+
+.client-header .dropdown-menu {
+    margin-top: 0.5rem;
+    border: none;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.1);
 }

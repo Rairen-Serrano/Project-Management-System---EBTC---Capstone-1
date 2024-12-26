@@ -8,10 +8,15 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'client') {
     exit;
 }
 
-// Get user information
-$stmt = $pdo->prepare("SELECT * FROM users WHERE user_id = ?");
+// Get user's appointments
+$stmt = $pdo->prepare("
+    SELECT appointment_id, service, date, time, status, created_at
+    FROM appointments 
+    WHERE client_id = ?
+    ORDER BY date DESC, time DESC
+");
 $stmt->execute([$_SESSION['user_id']]);
-$user = $stmt->fetch(PDO::FETCH_ASSOC);
+$appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -30,168 +35,136 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="#">
-                <img src="../images/EBTC_logo.png" alt="EBTC Logo" height="30" class="d-inline-block align-text-top me-2">
-                EBTC PMS
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
+<body id="dashboardPage">
+    <?php include 'client_header.php'; ?>
+    
+    <div class="client-dashboard-wrapper">
+        <!-- Main Content -->
+        <div class="client-main-content">
+            <!-- Mobile Toggle Button -->
+            <button class="btn btn-primary d-md-none mb-3" id="clientSidebarToggle">
+                <i class="fas fa-bars"></i>
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="dashboard.php">
-                            <i class="fas fa-tachometer-alt me-1"></i>Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="projects.php">
-                            <i class="fas fa-project-diagram me-1"></i>My Projects
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="documents.php">
-                            <i class="fas fa-file-alt me-1"></i>Documents
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="messages.php">
-                            <i class="fas fa-envelope me-1"></i>Messages
-                        </a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user-circle me-1"></i><?php echo htmlspecialchars($user['name']); ?>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="profile.php"><i class="fas fa-user me-2"></i>Profile</a></li>
-                            <li><a class="dropdown-item" href="settings.php"><i class="fas fa-cog me-2"></i>Settings</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="../logout.php"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
-                        </ul>
-                    </li>
-                </ul>
+
+            <!-- Success/Error Messages -->
+            <?php if (isset($_SESSION['success_message'])): ?>
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <?php 
+                    echo $_SESSION['success_message'];
+                    unset($_SESSION['success_message']);
+                    ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
+
+            <?php if (isset($_SESSION['error_message'])): ?>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <?php 
+                    echo $_SESSION['error_message'];
+                    unset($_SESSION['error_message']);
+                    ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
+
+            <!-- Appointments Section -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">My Appointments</h5>
+                            <a href="../book_appointment.php" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>Book New Appointment
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            <?php if (empty($appointments)): ?>
+                                <div class="text-center py-5">
+                                    <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                                    <h5>No Appointments Found</h5>
+                                    <p class="text-muted">You haven't booked any appointments yet.</p>
+                                    <a href="../book_appointment.php" class="btn btn-primary">
+                                        Book Your First Appointment
+                                    </a>
+                                </div>
+                            <?php else: ?>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Date & Time</th>
+                                                <th>Service</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($appointments as $appointment): ?>
+                                                <tr>
+                                                    <td>
+                                                        <?php 
+                                                        $date = new DateTime($appointment['date'] . ' ' . $appointment['time']);
+                                                        echo $date->format('M d, Y h:i A'); 
+                                                        ?>
+                                                    </td>
+                                                    <td><?php echo htmlspecialchars($appointment['service']); ?></td>
+                                                    <td>
+                                                        <?php
+                                                        $statusClass = '';
+                                                        switch($appointment['status']) {
+                                                            case 'pending':
+                                                                $statusClass = 'bg-warning';
+                                                                break;
+                                                            case 'confirmed':
+                                                                $statusClass = 'bg-success';
+                                                                break;
+                                                            case 'cancelled':
+                                                                $statusClass = 'bg-danger';
+                                                                break;
+                                                            case 'completed':
+                                                                $statusClass = 'bg-info';
+                                                                break;
+                                                        }
+                                                        ?>
+                                                        <span class="badge <?php echo $statusClass; ?>">
+                                                            <?php echo ucfirst($appointment['status']); ?>
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($appointment['status'] === 'pending'): ?>
+                                                            <button class="btn btn-sm btn-danger" onclick="cancelAppointment(<?php echo $appointment['appointment_id']; ?>)">
+                                                                <i class="fas fa-times"></i> Cancel
+                                                            </button>
+                                                        <?php endif; ?>
+                                                        <button class="btn btn-sm btn-info" onclick="viewDetails(<?php echo $appointment['appointment_id']; ?>)">
+                                                            <i class="fas fa-eye"></i> View
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </nav>
+    </div>
 
-    <!-- Main Content -->
-    <div class="container-fluid py-4">
-        <div class="row">
-            <!-- Welcome Card -->
-            <div class="col-md-12 mb-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h4 class="card-title">Welcome, <?php echo htmlspecialchars($user['name']); ?>!</h4>
-                        <p class="card-text">Here's an overview of your projects and activities.</p>
-                    </div>
+    <!-- View Details Modal -->
+    <div class="modal fade" id="appointmentDetailsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Appointment Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-            </div>
-
-            <!-- Quick Stats -->
-            <div class="col-md-3 mb-4">
-                <div class="card bg-primary text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Active Projects</h5>
-                        <h2 class="card-text">3</h2>
-                        <small>Currently in progress</small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-3 mb-4">
-                <div class="card bg-success text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Completed Projects</h5>
-                        <h2 class="card-text">5</h2>
-                        <small>Successfully delivered</small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-3 mb-4">
-                <div class="card bg-warning text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Pending Documents</h5>
-                        <h2 class="card-text">2</h2>
-                        <small>Awaiting review</small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-3 mb-4">
-                <div class="card bg-info text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">New Messages</h5>
-                        <h2 class="card-text">4</h2>
-                        <small>Unread messages</small>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recent Projects -->
-            <div class="col-md-8 mb-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Recent Projects</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Project Name</th>
-                                        <th>Status</th>
-                                        <th>Progress</th>
-                                        <th>Due Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>Project Alpha</td>
-                                        <td><span class="badge bg-success">Active</span></td>
-                                        <td>
-                                            <div class="progress">
-                                                <div class="progress-bar" role="progressbar" style="width: 75%">75%</div>
-                                            </div>
-                                        </td>
-                                        <td>Mar 31, 2024</td>
-                                    </tr>
-                                    <!-- Add more project rows as needed -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recent Activities -->
-            <div class="col-md-4 mb-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Recent Activities</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="activity-feed">
-                            <div class="activity-item">
-                                <i class="fas fa-file-upload text-primary"></i>
-                                <span>New document uploaded</span>
-                                <small class="text-muted">2 hours ago</small>
-                            </div>
-                            <div class="activity-item">
-                                <i class="fas fa-comment text-success"></i>
-                                <span>New comment on Project Alpha</span>
-                                <small class="text-muted">5 hours ago</small>
-                            </div>
-                            <!-- Add more activity items as needed -->
-                        </div>
-                    </div>
+                <div class="modal-body">
+                    <!-- Details will be loaded here via JavaScript -->
                 </div>
             </div>
         </div>
@@ -200,6 +173,44 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../js/script.js"></script>
-    <?php include '../footer.php'; ?>
+    <script>
+        function cancelAppointment(appointmentId) {
+            if (confirm('Are you sure you want to cancel this appointment?')) {
+                fetch('cancel_appointment.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'appointment_id=' + appointmentId
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert(data.message || 'Error cancelling appointment');
+                    }
+                });
+            }
+        }
+
+        function viewDetails(appointmentId) {
+            fetch('get_appointment_details.php?id=' + appointmentId)
+                .then(response => response.json())
+                .then(data => {
+                    const modal = new bootstrap.Modal(document.getElementById('appointmentDetailsModal'));
+                    document.querySelector('#appointmentDetailsModal .modal-body').innerHTML = `
+                        <div class="appointment-details">
+                            <p><strong>Date:</strong> ${data.date}</p>
+                            <p><strong>Time:</strong> ${data.time}</p>
+                            <p><strong>Service:</strong> ${data.service}</p>
+                            <p><strong>Status:</strong> <span class="badge bg-${data.statusClass}">${data.status}</span></p>
+                            <p><strong>Booked on:</strong> ${data.created_at}</p>
+                        </div>
+                    `;
+                    modal.show();
+                });
+        }
+    </script>
 </body>
 </html> 

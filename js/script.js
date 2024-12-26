@@ -12,9 +12,134 @@ document.addEventListener('DOMContentLoaded', function() {
         case 'adminLoginPage':
             handleAdminLoginPage();
             break;
+        case 'appointmentPage':
+            handleAppointmentPage();
+            break;
+        case 'dashboardPage':
+            handleDashboardPage();
+            break;
         // Add more cases as needed
     }
+
+    // Add password visibility toggle for reset password page
+    handlePasswordToggles();
 });
+
+// Move the password toggle functionality to a separate function
+function handlePasswordToggles() {
+    const passwordFields = document.querySelectorAll('input[type="password"]');
+    passwordFields.forEach(field => {
+        // Create and add toggle button
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'btn btn-link password-toggle';
+        toggleBtn.innerHTML = '<i class="fa-solid fa-eye" style="color: #000000;"></i>';
+        field.parentElement.appendChild(toggleBtn);
+
+        // Add click event
+        toggleBtn.addEventListener('click', function() {
+            const type = field.getAttribute('type') === 'password' ? 'text' : 'password';
+            field.setAttribute('type', type);
+            this.innerHTML = type === 'password' 
+                ? '<i class="fa-solid fa-eye" style="color: #000000;"></i>' 
+                : '<i class="fa-solid fa-eye-slash" style="color: #000000;"></i>';
+        });
+    });
+}
+
+// Add the appointment page handling function
+function handleAppointmentPage() {
+    const serviceCheckboxes = document.querySelectorAll('.service-checkbox');
+    const selectedServicesDisplay = document.getElementById('selectedServicesDisplay');
+    const selectedServicesList = document.getElementById('selectedServicesList');
+
+    serviceCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const serviceRow = this.closest('.service-row');
+            if (this.checked) {
+                serviceRow.classList.add('selected');
+            } else {
+                serviceRow.classList.remove('selected');
+            }
+            updateSelectedServices();
+        });
+    });
+
+    function updateSelectedServices() {
+        const selectedCheckboxes = document.querySelectorAll('.service-checkbox:checked');
+        
+        if (selectedCheckboxes.length > 0) {
+            selectedServicesDisplay.style.display = 'block';
+            selectedServicesList.innerHTML = '';
+            
+            selectedCheckboxes.forEach(checkbox => {
+                const serviceName = checkbox.dataset.serviceName;
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <i class="fas fa-check me-2 text-success"></i>
+                    ${serviceName}
+                    <i class="fas fa-times remove-service" 
+                       onclick="removeService('${checkbox.id}')"></i>
+                `;
+                selectedServicesList.appendChild(li);
+            });
+        } else {
+            selectedServicesDisplay.style.display = 'none';
+        }
+    }
+
+    // Add this function to the global scope
+    window.removeService = function(checkboxId) {
+        const checkbox = document.getElementById(checkboxId);
+        if (checkbox) {
+            checkbox.checked = false;
+            checkbox.closest('.service-row').classList.remove('selected');
+            updateSelectedServices();
+        }
+    };
+
+    // Initialize AOS
+    if (typeof AOS !== 'undefined') {
+        AOS.init({
+            duration: 800,
+            once: true
+        });
+    }
+
+    // Add form validation
+    const appointmentForm = document.getElementById('appointmentForm');
+    if (appointmentForm) {
+        appointmentForm.addEventListener('submit', function(e) {
+            const selectedServices = document.querySelectorAll('.service-checkbox:checked');
+            
+            if (selectedServices.length === 0) {
+                e.preventDefault();
+                alert('Please select at least one service');
+                return false;
+            }
+            
+            // Validate date and time
+            const dateInput = document.querySelector('input[name="date"]');
+            const timeInput = document.querySelector('input[name="time"]');
+            
+            if (!dateInput.value || !timeInput.value) {
+                e.preventDefault();
+                alert('Please select both date and time');
+                return false;
+            }
+
+            // Check if selected date is not in the past
+            const selectedDate = new Date(dateInput.value + ' ' + timeInput.value);
+            const now = new Date();
+            
+            if (selectedDate < now) {
+                e.preventDefault();
+                alert('Please select a future date and time');
+                return false;
+            }
+        });
+    }
+}
 
 // Registration page functions
 function handleRegisterPage() {
@@ -73,26 +198,6 @@ function handleRegisterPage() {
             matchIndicator.innerHTML = '';
         }
     }
-
-    // Add password visibility toggle
-    const passwordFields = document.querySelectorAll('input[type="password"]');
-    passwordFields.forEach(field => {
-        // Create and add toggle button
-        const toggleBtn = document.createElement('button');
-        toggleBtn.type = 'button';
-        toggleBtn.className = 'btn btn-link password-toggle';
-        toggleBtn.innerHTML = '<i class="fa-solid fa-eye" style="color: #000000;"></i>';
-        field.parentElement.appendChild(toggleBtn);
-
-        // Add click event
-        toggleBtn.addEventListener('click', function() {
-            const type = field.getAttribute('type') === 'password' ? 'text' : 'password';
-            field.setAttribute('type', type);
-            this.innerHTML = type === 'password' 
-                ? '<i class="fa-solid fa-eye" style="color: #000000;"></i>' 
-                : '<i class="fa-solid fa-eye-slash" style="color: #000000;"></i>';
-        });
-    });
 }
 
 // Login page functions
@@ -258,3 +363,48 @@ function updateStrengthIndicator(strength, indicator) {
         <small class="text-${strengthClass} mt-1 d-block">${strengthText}</small>
     `;
 }
+
+// Add this to your existing handleDashboardPage function or create it if it doesn't exist
+function handleDashboardPage() {
+    // Sidebar Toggle for Client Dashboard
+    const sidebarToggle = document.getElementById('clientSidebarToggle');
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', function() {
+            document.querySelector('.client-sidebar').classList.toggle('active');
+            document.querySelector('.client-main-content').classList.toggle('active');
+        });
+    }
+
+    // Set active menu item based on current page
+    const currentPage = window.location.pathname.split('/').pop();
+    const menuItems = document.querySelectorAll('.client-sidebar-menu a');
+    menuItems.forEach(item => {
+        if (item.getAttribute('href') === currentPage) {
+            item.classList.add('active');
+        }
+    });
+}
+
+// Client Dashboard Sidebar Toggle
+document.addEventListener('DOMContentLoaded', function() {
+    const sidebarToggle = document.getElementById('clientSidebarToggle');
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', function() {
+            document.querySelector('.client-sidebar').classList.toggle('active');
+            document.querySelector('.client-main-content').classList.toggle('active');
+        });
+    }
+});
+
+// Close sidebar when clicking outside on mobile
+document.addEventListener('click', function(event) {
+    const sidebar = document.querySelector('.client-sidebar');
+    const sidebarToggle = document.getElementById('clientSidebarToggle');
+    
+    if (sidebar && sidebar.classList.contains('active')) {
+        if (!sidebar.contains(event.target) && event.target !== sidebarToggle) {
+            sidebar.classList.remove('active');
+            document.querySelector('.client-main-content').classList.remove('active');
+        }
+    }
+});

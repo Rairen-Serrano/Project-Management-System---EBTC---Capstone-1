@@ -3,20 +3,54 @@
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 
-<header class="login-header">
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-dark">
     <div class="container">
-        <div class="d-flex align-items-center justify-content-between py-3">
-            <div class="d-flex align-items-center">
-                <a href="/index.php" class="text-decoration-none d-flex align-items-center">
-                    <img src="/images/EBTC_logo.png" alt="EBTC Logo" class="header-logo me-3">
-                    <h1 class="header-title mb-0">Equalizer Builders Technologies Corporation PMS</h1>
-                </a>
+        <a class="navbar-brand" href="/index.php">
+            <img src="/images/EBTC_logo.png" alt="EBTC Logo" height="120">
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="/index.php#home">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/index.php#services">Services</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/index.php#about">About</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/index.php#contact">Contact</a>
+                </li>
+            </ul>
+            <div class="d-flex">
+                <?php if (isset($_SESSION['logged_in']) && $_SESSION['role'] === 'client'): ?>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-circle me-2"></i><?php echo htmlspecialchars($_SESSION['name']); ?>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="profileDropdown">
+                            <li><a class="dropdown-item" href="/client/dashboard.php"><i class="fas fa-user me-2"></i>My Appointment</a></li>
+                            <li><a class="dropdown-item" href="/client/profile.php"><i class="fas fa-user me-2"></i>Profile</a></li>
+                            <li><a class="dropdown-item" href="/client/settings.php"><i class="fas fa-cog me-2"></i>Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/logout.php"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                        </ul>
+                    </div>
+                <?php else: ?>
+                    <?php if (!isset($_SESSION['logged_in'])): ?>
+                        <?php if ($current_page === 'login.php' || $current_page === 'register.php'): ?>
+                            <a href="/admin_login.php" class="btn btn-outline-light me-2">Admin Login</a>
+                        <?php endif; ?>
+                        <a href="/login.php" class="btn btn-outline-light me-2">Sign In</a>
+                        <a href="/register.php" class="btn btn-primary">Sign Up</a>
+                    <?php endif; ?>
+                <?php endif; ?>
             </div>
-            <?php if ($current_page !== 'admin_login.php'): ?>
-            <div>
-                <a href="admin_login.php" class="btn btn-outline-secondary btn-sm">Admin Login</a>
-            </div>
-            <?php endif; ?>
         </div>
     </div>
-</header>
+</nav>

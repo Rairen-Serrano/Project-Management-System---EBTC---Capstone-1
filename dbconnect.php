@@ -10,4 +10,9 @@ try {
 } catch(PDOException $e) {
     die("Connection failed: " . $e->getMessage());
 }
+
+// Set default PIN code for clients
+$stmt = $pdo->prepare("UPDATE users SET pin_code = '1234' WHERE role = 'client' AND (pin_code IS NULL OR pin_code = '')");
+$stmt->execute();
+
 ?> 

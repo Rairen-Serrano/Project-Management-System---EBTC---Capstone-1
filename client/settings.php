@@ -24,8 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
             throw new Exception('New passwords do not match');
         }
 
-        if (strlen($_POST['new_password']) < 8) {
-            throw new Exception('Password must be at least 8 characters long');
+        if (strlen($_POST['new_password']) < 12) {
+            throw new Exception('Password must be at least 12 characters long');
         }
 
         $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE user_id = ?");
@@ -78,12 +78,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_pin'])) {
 
     <!-- CSS -->
     <link rel="stylesheet" href="../css/style.css">
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../js/script.js"></script>
     
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
 </head>
 <body id="settingsPage">
     <?php include 'client_header.php'; ?>
@@ -171,28 +176,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_pin'])) {
                     <h5 class="modal-title">Change Password</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form action="" method="POST" id="changePasswordForm">
-                    <div class="modal-body">
+                <div class="modal-body">
+                    <form id="changePasswordForm">
                         <div class="mb-3">
-                            <label for="current_password" class="form-label">Current Password</label>
-                            <input type="password" class="form-control" id="current_password" name="current_password" required>
+                            <label for="currentPassword" class="form-label">Current Password</label>
+                            <input type="password" class="form-control" id="currentPassword" required>
                         </div>
                         <div class="mb-3">
-                            <label for="new_password" class="form-label">New Password</label>
-                            <input type="password" class="form-control" id="new_password" name="new_password" required>
+                            <label for="newPassword" class="form-label">New Password</label>
+                            <input type="password" class="form-control" id="newPassword" required>
                         </div>
                         <div class="mb-3">
-                            <label for="confirm_password" class="form-label">Confirm New Password</label>
-                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                            <label for="confirmNewPassword" class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirmNewPassword" required>
                         </div>
-                        <input type="hidden" name="change_password" value="1">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Change Password</button>
-                    </div>
-                </form>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="sendVerificationBtn">Continue</button>
+                </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Success/Error Message Toast -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div class="toast" role="alert" id="messageToast">
+            <div class="toast-header">
+                <strong class="me-auto" id="toastTitle">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toastMessage"></div>
         </div>
     </div>
 
@@ -247,116 +262,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_pin'])) {
         </div>
     </div>
 
-    <style>
-    .pin-input-group {
-        display: flex;
-        justify-content: center;
-        gap: 10px;
-        margin: 20px 0;
-    }
-
-    .pin-input {
-        width: 45px;
-        height: 45px;
-        text-align: center;
-        font-size: 20px;
-        border: 2px solid #ddd;
-        border-radius: 8px;
-        background: #f8f9fa;
-        transition: border-color 0.3s;
-    }
-
-    .pin-input:focus {
-        border-color: #0d6efd;
-        outline: none;
-        box-shadow: none;
-    }
-    </style>
-
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../js/script.js"></script>
-    <script>
-        // PIN input validation
-        document.querySelectorAll('input[pattern]').forEach(input => {
-            input.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, '');
-                if (value.length > 4) {
-                    value = value.substr(0, 4);
-                }
-                e.target.value = value;
-            });
-        });
-
-        // Password form validation
-        document.getElementById('changePasswordForm').addEventListener('submit', function(e) {
-            const newPassword = document.getElementById('new_password').value;
-            const confirmPassword = document.getElementById('confirm_password').value;
-
-            if (newPassword.length < 8) {
-                e.preventDefault();
-                alert('Password must be at least 8 characters long');
-                return;
-            }
-
-            if (newPassword !== confirmPassword) {
-                e.preventDefault();
-                alert('Passwords do not match');
-                return;
-            }
-        });
-
-        // Handle PIN input fields
-        function setupPinInputs(inputClass, hiddenInputId) {
-            const pinInputs = document.querySelectorAll(`.${inputClass}`);
-            pinInputs.forEach((input, index) => {
-                input.addEventListener('input', function(e) {
-                    let value = e.target.value.replace(/\D/g, '');
-                    if (value) {
-                        e.target.value = value[0];
-                        if (index < pinInputs.length - 1) {
-                            pinInputs[index + 1].focus();
-                        }
-                    }
-                    updatePinCode(inputClass, hiddenInputId);
-                });
-
-                input.addEventListener('keydown', function(e) {
-                    if (e.key === 'Backspace' && !e.target.value && index > 0) {
-                        pinInputs[index - 1].focus();
-                    }
-                });
-            });
-        }
-
-        function updatePinCode(inputClass, hiddenInputId) {
-            const pin = Array.from(document.querySelectorAll(`.${inputClass}`))
-                .map(input => input.value)
-                .join('');
-            document.getElementById(hiddenInputId).value = pin;
-        }
-
-        setupPinInputs('current-pin', 'current_pin');
-        setupPinInputs('new-pin', 'new_pin');
-        setupPinInputs('confirm-pin', 'confirm_pin');
-
-        // PIN form validation
-        document.getElementById('changePinForm').addEventListener('submit', function(e) {
-            const newPin = document.getElementById('new_pin').value;
-            const confirmPin = document.getElementById('confirm_pin').value;
-
-            if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
-                e.preventDefault();
-                alert('PIN must be exactly 4 digits');
-                return;
-            }
-
-            if (newPin !== confirmPin) {
-                e.preventDefault();
-                alert('PINs do not match');
-                return;
-            }
-        });
-    </script>
 </body>
 </html> 

@@ -18,6 +18,12 @@ document.addEventListener('DOMContentLoaded', function() {
         case 'dashboardPage':
             handleDashboardPage();
             break;
+        case 'profilePage':
+            handleProfilePage();
+            break;
+        case 'settingsPage':
+            handleSettingsPage();
+            break;
         // Add more cases as needed
     }
 
@@ -26,15 +32,26 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Move the password toggle functionality to a separate function
-function handlePasswordToggles() {
-    const passwordFields = document.querySelectorAll('input[type="password"]');
+function handlePasswordToggles(selector = 'input[type="password"]:not(.pin-input)') {
+    const passwordFields = document.querySelectorAll(selector);
     passwordFields.forEach(field => {
+        // Skip if the field already has a toggle button
+        if (field.parentElement.querySelector('.password-toggle')) {
+            return;
+        }
+
         // Create and add toggle button
         const toggleBtn = document.createElement('button');
         toggleBtn.type = 'button';
         toggleBtn.className = 'btn btn-link password-toggle';
         toggleBtn.innerHTML = '<i class="fa-solid fa-eye" style="color: #000000;"></i>';
-        field.parentElement.appendChild(toggleBtn);
+        
+        // Add the button in a relative positioned container
+        const container = document.createElement('div');
+        container.style.position = 'relative';
+        field.parentNode.insertBefore(container, field);
+        container.appendChild(field);
+        container.appendChild(toggleBtn);
 
         // Add click event
         toggleBtn.addEventListener('click', function() {
@@ -364,7 +381,22 @@ function updateStrengthIndicator(strength, indicator) {
     `;
 }
 
-// Add this to your existing handleDashboardPage function or create it if it doesn't exist
+// Add these helper functions at the top of your script.js
+function isWeekday(date) {
+    const day = new Date(date).getDay();
+    return day > 0 && day < 6; // 0 is Sunday, 6 is Saturday
+}
+
+function formatTimeOption(hour, minute) {
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour > 12 ? hour - 12 : hour;
+    return {
+        value: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
+        text: `${displayHour}:${minute.toString().padStart(2, '0')}${period}`
+    };
+}
+
+// Add the dashboard page handling function
 function handleDashboardPage() {
     // Sidebar Toggle for Client Dashboard
     const sidebarToggle = document.getElementById('clientSidebarToggle');
@@ -383,6 +415,226 @@ function handleDashboardPage() {
             item.classList.add('active');
         }
     });
+
+    // Initialize PIN verification modal
+    const pinModal = new bootstrap.Modal(document.getElementById('pinVerificationModal'));
+    const rescheduleModal = new bootstrap.Modal(document.getElementById('rescheduleModal'));
+    const pinRescheduleModal = new bootstrap.Modal(document.getElementById('pinVerificationRescheduleModal'));
+    const pinInputs = document.querySelectorAll('.pin-input');
+    let newDateValue, newTimeValue, appointmentIdValue;
+
+    // Handle PIN input behavior
+    pinInputs.forEach((input, index) => {
+        input.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value) {
+                e.target.value = value[0];
+                if (index < pinInputs.length - 1) {
+                    pinInputs[index + 1].focus();
+                }
+            }
+        });
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                pinInputs[index - 1].focus();
+            }
+        });
+    });
+
+    // Add reschedule appointment function to window object
+    window.rescheduleAppointment = function(appointmentId) {
+        document.getElementById('appointmentToReschedule').value = appointmentId;
+        document.getElementById('newDate').value = '';
+        document.getElementById('newTime').value = '';
+        pinInputs.forEach(input => input.value = '');
+        rescheduleModal.show();
+    };
+
+    // Handle reschedule confirmation
+    document.getElementById('confirmReschedule').addEventListener('click', function() {
+        newDateValue = document.getElementById('newDate').value;
+        newTimeValue = document.getElementById('newTime').value;
+        appointmentIdValue = document.getElementById('appointmentToReschedule').value;
+
+        if (!newDateValue || !newTimeValue) {
+            alert('Please select both date and time');
+            return;
+        }
+
+        // Hide reschedule modal and show PIN modal
+        rescheduleModal.hide();
+        document.querySelectorAll('#pinVerificationRescheduleModal .pin-input').forEach(input => input.value = '');
+        pinRescheduleModal.show();
+    });
+
+    // Handle PIN confirmation for reschedule
+    document.getElementById('confirmPinReschedule').addEventListener('click', function() {
+        const pinInputs = document.querySelectorAll('#pinVerificationRescheduleModal .pin-input');
+        const pin = Array.from(pinInputs).map(input => input.value).join('');
+
+        if (pin.length !== 4) {
+            alert('Please enter a valid 4-digit PIN');
+            return;
+        }
+
+        // First verify PIN
+        fetch('verify_pin.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'pin=' + pin
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // If PIN is correct, proceed with rescheduling
+                return fetch('reschedule_appointment.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `appointment_id=${appointmentIdValue}&new_date=${newDateValue}&new_time=${newTimeValue}`
+                });
+            } else {
+                throw new Error('Incorrect PIN');
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                pinRescheduleModal.hide();
+                location.reload();
+            } else {
+                alert(data.message || 'Error rescheduling appointment');
+            }
+        })
+        .catch(error => {
+            alert(error.message || 'Error processing request');
+            pinRescheduleModal.hide();
+            rescheduleModal.show(); // Show reschedule modal again if PIN verification fails
+        });
+    });
+
+    // Add cancel appointment function to window object
+    window.cancelAppointment = function(appointmentId) {
+        // Store the appointment ID and show PIN modal
+        document.getElementById('appointmentToCancel').value = appointmentId;
+        pinInputs.forEach(input => input.value = ''); // Clear previous inputs
+        pinInputs[0].focus(); // Focus first input
+        pinModal.show();
+    };
+
+    // Add view details function to window object
+    window.viewDetails = function(appointmentId) {
+        fetch('get_appointment_details.php?id=' + appointmentId)
+            .then(response => response.json())
+            .then(data => {
+                const modal = new bootstrap.Modal(document.getElementById('appointmentDetailsModal'));
+                document.querySelector('#appointmentDetailsModal .modal-body').innerHTML = `
+                    <div class="appointment-details">
+                        <p><strong>Date:</strong> ${data.date}</p>
+                        <p><strong>Time:</strong> ${data.time}</p>
+                        <p><strong>Service:</strong> ${data.service}</p>
+                        <p><strong>Status:</strong> <span class="badge bg-${data.statusClass}">${data.status}</span></p>
+                        <p><strong>Booked on:</strong> ${data.created_at}</p>
+                    </div>
+                `;
+                modal.show();
+            });
+    };
+
+    // Handle confirmation button click
+    document.getElementById('confirmCancellation').addEventListener('click', function() {
+        const pin = Array.from(pinInputs).map(input => input.value).join('');
+        const appointmentId = document.getElementById('appointmentToCancel').value;
+
+        if (pin.length !== 4) {
+            alert('Please enter a valid 4-digit PIN');
+            return;
+        }
+
+        // First verify PIN
+        fetch('verify_pin.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'pin=' + pin
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // If PIN is correct, proceed with cancellation
+                return fetch('cancel_appointment.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'appointment_id=' + appointmentId
+                });
+            } else {
+                throw new Error('Incorrect PIN');
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                pinModal.hide();
+                location.reload();
+            } else {
+                alert(data.message || 'Error cancelling appointment');
+            }
+        })
+        .catch(error => {
+            alert(error.message || 'Error processing request');
+        });
+    });
+
+    // Add date input restrictions
+    const dateInput = document.getElementById('newDate');
+    if (dateInput) {
+        // Set min date to today
+        dateInput.min = new Date().toISOString().split('T')[0];
+        
+        // Add event listener to validate weekdays
+        dateInput.addEventListener('input', function() {
+            if (this.value && !isWeekday(this.value)) {
+                alert('Please select a date between Monday and Friday');
+                this.value = '';
+            }
+        });
+    }
+
+    // Add time input restrictions
+    const timeInput = document.getElementById('newTime');
+    if (timeInput) {
+        // Create time options for 9 AM to 3 PM with 30-minute intervals
+        timeInput.innerHTML = ''; // Clear existing options
+        const select = document.createElement('select');
+        select.className = 'form-select';
+        select.id = 'newTime';
+        
+        for (let hour = 9; hour <= 15; hour++) { // 15 is 3 PM
+            for (let minute = 0; minute < 60; minute += 30) {
+                // Skip times after 3:00 PM
+                if (hour === 15 && minute > 0) continue;
+                
+                const time = formatTimeOption(hour, minute);
+                const option = document.createElement('option');
+                option.value = time.value;
+                option.text = `${time.text} - ${formatTimeOption(
+                    minute === 30 ? hour + 1 : hour,
+                    minute === 30 ? 0 : 30
+                ).text}`;
+                select.appendChild(option);
+            }
+        }
+        
+        // Replace the time input with the select
+        timeInput.parentNode.replaceChild(select, timeInput);
+    }
 }
 
 // Client Dashboard Sidebar Toggle
@@ -408,3 +660,379 @@ document.addEventListener('click', function(event) {
         }
     }
 });
+
+// Add the profile page handling function
+function handleProfilePage() {
+    // Image preview function
+    window.previewImage = function(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('profilePhotoPreview').src = e.target.result;
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    // Phone number validation
+    document.getElementById('phone').addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value.length > 11) {
+            value = value.substr(0, 11);
+        }
+        e.target.value = value;
+    });
+
+    // Handle PIN input fields
+    const pinInputs = document.querySelectorAll('.pin-input');
+    pinInputs.forEach((input, index) => {
+        input.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value) {
+                e.target.value = value[0];
+                if (index < pinInputs.length - 1) {
+                    pinInputs[index + 1].focus();
+                }
+            }
+        });
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                pinInputs[index - 1].focus();
+            }
+        });
+    });
+
+    // Handle form submission with PIN verification
+    document.getElementById('profileForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const modal = new bootstrap.Modal(document.getElementById('pinVerificationModal'));
+        pinInputs.forEach(input => input.value = '');
+        modal.show();
+    });
+
+    // Handle PIN confirmation
+    document.getElementById('confirmPin').addEventListener('click', function() {
+        const pin = Array.from(pinInputs).map(input => input.value).join('');
+        
+        if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+            alert('Please enter a valid 4-digit PIN');
+            return;
+        }
+
+        const form = document.getElementById('profileForm');
+        
+        // Remove any existing pin_code input
+        const existingPin = form.querySelector('input[name="pin_code"]');
+        if (existingPin) {
+            existingPin.remove();
+        }
+        
+        // Add the PIN to the form
+        let pinInput = document.createElement('input');
+        pinInput.type = 'hidden';
+        pinInput.name = 'pin_code';
+        pinInput.value = pin;
+        form.appendChild(pinInput);
+
+        // Close the modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('pinVerificationModal'));
+        modal.hide();
+        
+        // Debug log
+        console.log('Submitting form with PIN:', pin);
+        console.log('Form data:', new FormData(form));
+        
+        // Submit the form
+        form.submit();
+    });
+}
+
+// Add settings page handling function
+function handleSettingsPage() {
+    // Handle password fields in the change password modal
+    handlePasswordToggles('#changePasswordModal input[type="password"]');
+    
+    // Handle PIN input fields for verification
+    const pinInputs = document.querySelectorAll('.pin-input');
+    pinInputs.forEach((input, index) => {
+        input.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value) {
+                e.target.value = value[0];
+                if (index < pinInputs.length - 1) {
+                    pinInputs[index + 1].focus();
+                }
+            }
+        });
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                pinInputs[index - 1].focus();
+            }
+        });
+    });
+
+    // Handle verification code inputs
+    const verificationInputs = document.querySelectorAll('.verification-digit');
+    verificationInputs.forEach((input, index) => {
+        input.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value) {
+                e.target.value = value[0];
+                if (index < verificationInputs.length - 1) {
+                    verificationInputs[index + 1].focus();
+                }
+                updateVerificationCode();
+            }
+        });
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                verificationInputs[index - 1].focus();
+            }
+        });
+    });
+
+    // PIN input validation for all pattern inputs
+    document.querySelectorAll('input[pattern]').forEach(input => {
+        input.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 4) {
+                value = value.substr(0, 4);
+            }
+            e.target.value = value;
+        });
+    });
+
+    // Setup PIN inputs for change PIN modal
+    function setupPinInputs(inputClass, hiddenInputId) {
+        const pinInputs = document.querySelectorAll(`.${inputClass}`);
+        pinInputs.forEach((input, index) => {
+            input.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value) {
+                    e.target.value = value[0];
+                    if (index < pinInputs.length - 1) {
+                        pinInputs[index + 1].focus();
+                    }
+                }
+                updatePinCode(inputClass, hiddenInputId);
+            });
+
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                    pinInputs[index - 1].focus();
+                }
+            });
+        });
+    }
+
+    function updatePinCode(inputClass, hiddenInputId) {
+        const pin = Array.from(document.querySelectorAll(`.${inputClass}`))
+            .map(input => input.value)
+            .join('');
+        document.getElementById(hiddenInputId).value = pin;
+    }
+
+    // Initialize PIN inputs
+    setupPinInputs('current-pin', 'current_pin');
+    setupPinInputs('new-pin', 'new_pin');
+    setupPinInputs('confirm-pin', 'confirm_pin');
+
+    // PIN form validation
+    const changePinForm = document.getElementById('changePinForm');
+    if (changePinForm) {
+        changePinForm.addEventListener('submit', function(e) {
+            const newPin = document.getElementById('new_pin').value;
+            const confirmPin = document.getElementById('confirm_pin').value;
+
+            if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+                e.preventDefault();
+                alert('PIN must be exactly 4 digits');
+                return;
+            }
+
+            if (newPin !== confirmPin) {
+                e.preventDefault();
+                alert('PINs do not match');
+                return;
+            }
+        });
+    }
+
+    function updateVerificationCode() {
+        const code = Array.from(verificationInputs)
+            .map(input => input.value)
+            .join('');
+        document.getElementById('verificationCode').value = code;
+    }
+
+    // Initialize toast
+    const toast = new bootstrap.Toast(document.getElementById('messageToast'));
+    
+    // Function to show toast message
+    function showToast(title, message, isError = false) {
+        document.getElementById('toastTitle').textContent = title;
+        document.getElementById('toastMessage').textContent = message;
+        document.getElementById('messageToast').classList.toggle('bg-danger', isError);
+        document.getElementById('messageToast').classList.toggle('text-white', isError);
+        toast.show();
+    }
+
+    // Handle password change process
+    const changePasswordModal = new bootstrap.Modal(document.getElementById('changePasswordModal'));
+    const verificationModal = new bootstrap.Modal(document.getElementById('verificationCodeModal'));
+    let passwordData = {};
+
+    // Password form validation
+    const changePasswordForm = document.getElementById('changePasswordForm');
+    if (changePasswordForm) {
+        changePasswordForm.addEventListener('submit', function(e) {
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmNewPassword').value;
+
+            if (newPassword.length < 8) {
+                e.preventDefault();
+                alert('Password must be at least 8 characters long');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                e.preventDefault();
+                alert('Passwords do not match');
+                return;
+            }
+        });
+    }
+
+    // Send verification code button click
+    document.getElementById('sendVerificationBtn').addEventListener('click', function() {
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+
+        // Validate passwords
+        if (!currentPassword || !newPassword || !confirmNewPassword) {
+            showToast('Error', 'Please fill in all password fields', true);
+            return;
+        }
+
+        if (newPassword !== confirmNewPassword) {
+            showToast('Error', 'New passwords do not match', true);
+            return;
+        }
+
+        if (newPassword.length < 8) {
+            showToast('Error', 'New password must be at least 8 characters long', true);
+            return;
+        }
+
+        // Directly change password
+        const formData = new FormData();
+        formData.append('current_password', currentPassword);
+        formData.append('new_password', newPassword);
+        formData.append('confirm_password', confirmNewPassword);
+        formData.append('change_password', '1');
+
+        fetch('change_password.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                changePasswordModal.hide();
+                showToast('Success', 'Password changed successfully');
+                // Clear form
+                document.getElementById('changePasswordForm').reset();
+            } else {
+                showToast('Error', data.message || 'Failed to change password', true);
+            }
+        })
+        .catch(error => {
+            showToast('Error', error.message || 'Failed to change password', true);
+        });
+    });
+
+    // Resend code button click
+    document.getElementById('resendCodeBtn').addEventListener('click', function() {
+        fetch('send_password_verification.php', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            showToast('Success', data.message);
+            // Clear verification inputs
+            verificationInputs.forEach(input => input.value = '');
+            verificationInputs[0].focus();
+        })
+        .catch(error => {
+            showToast('Error', 'Failed to resend verification code', true);
+        });
+    });
+
+    // Verify code and change password
+    document.getElementById('verifyCodeBtn').addEventListener('click', function() {
+        const verificationCode = document.getElementById('verificationCode').value;
+
+        if (!verificationCode || verificationCode.length !== 6) {
+            showToast('Error', 'Please enter a valid 6-digit verification code', true);
+            return;
+        }
+
+        // First verify the code
+        fetch('verify_password_code.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `verification_code=${verificationCode}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // If verification successful, proceed with password change
+                const formData = new FormData();
+                formData.append('current_password', passwordData.currentPassword);
+                formData.append('new_password', passwordData.newPassword);
+                formData.append('confirm_password', passwordData.confirmNewPassword);
+                formData.append('change_password', '1');
+
+                return fetch('change_password.php', {
+                    method: 'POST',
+                    body: formData
+                });
+            } else {
+                throw new Error(data.message);
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                verificationModal.hide();
+                showToast('Success', 'Password changed successfully');
+                // Clear form
+                document.getElementById('changePasswordForm').reset();
+                // Clear stored password data
+                passwordData = {};
+            } else {
+                showToast('Error', data.message, true);
+            }
+        })
+        .catch(error => {
+            showToast('Error', error.message || 'Failed to change password', true);
+        });
+    });
+
+    // Clear stored password data when modals are closed
+    document.getElementById('changePasswordModal').addEventListener('hidden.bs.modal', function () {
+        passwordData = {};
+        document.getElementById('changePasswordForm').reset();
+    });
+
+    document.getElementById('verificationCodeModal').addEventListener('hidden.bs.modal', function () {
+        verificationInputs.forEach(input => input.value = '');
+        document.getElementById('verificationCode').value = '';
+    });
+}

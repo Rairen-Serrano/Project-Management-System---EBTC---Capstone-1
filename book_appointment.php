@@ -231,5 +231,67 @@ $services = [
     
     <!-- Custom JS -->
     <script src="js/script.js"></script>
+
+    <!-- Add this JavaScript to handle date and time restrictions -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Date restrictions
+        const dateInput = document.querySelector('input[name="date"]');
+        if (dateInput) {
+            // Set min date to today
+            dateInput.min = new Date().toISOString().split('T')[0];
+            
+            // Add event listener to validate weekdays
+            dateInput.addEventListener('input', function() {
+                const selected = new Date(this.value);
+                const day = selected.getDay();
+                
+                if (day === 0 || day === 6) { // 0 is Sunday, 6 is Saturday
+                    alert('Please select a date between Monday and Friday');
+                    this.value = '';
+                }
+            });
+        }
+
+        // Time restrictions
+        const timeInput = document.querySelector('input[name="time"]');
+        if (timeInput) {
+            const timeSelect = document.createElement('select');
+            timeSelect.className = 'form-select';
+            timeSelect.name = 'time';
+            timeSelect.required = true;
+
+            function formatTimeOption(hour, minute) {
+                const period = hour >= 12 ? 'PM' : 'AM';
+                const displayHour = hour > 12 ? hour - 12 : hour;
+                return {
+                    value: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
+                    text: `${displayHour}:${minute.toString().padStart(2, '0')}${period}`
+                };
+            }
+
+            // Add time options from 9 AM to 3 PM with 30-minute intervals
+            for (let hour = 9; hour <= 15; hour++) {
+                for (let minute = 0; minute < 60; minute += 30) {
+                    // Skip times after 3:00 PM
+                    if (hour === 15 && minute > 0) continue;
+                    
+                    const time = formatTimeOption(hour, minute);
+                    const nextTime = minute === 30 ? 
+                        formatTimeOption(hour + 1, 0) : 
+                        formatTimeOption(hour, 30);
+                    
+                    const option = document.createElement('option');
+                    option.value = time.value;
+                    option.text = `${time.text} - ${nextTime.text}`;
+                    timeSelect.appendChild(option);
+                }
+            }
+
+            // Replace the time input with the select
+            timeInput.parentNode.replaceChild(timeSelect, timeInput);
+        }
+    });
+    </script>
 </body>
 </html> 

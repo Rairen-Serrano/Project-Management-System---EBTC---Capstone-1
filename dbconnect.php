@@ -15,4 +15,12 @@ try {
 $stmt = $pdo->prepare("UPDATE users SET pin_code = '1234' WHERE role = 'client' AND (pin_code IS NULL OR pin_code = '')");
 $stmt->execute();
 
+// Set default profile photo for clients who don't have one
+$default_image_path = 'images/default_profile.jpg';
+if (file_exists($default_image_path)) {
+    $default_photo = file_get_contents($default_image_path);
+    $stmt = $pdo->prepare("UPDATE users SET profile_photo = ? WHERE role = 'client' AND profile_photo IS NULL");
+    $stmt->execute([$default_photo]);
+}
+
 ?> 

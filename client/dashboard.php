@@ -28,14 +28,20 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <!-- CSS -->
     <link rel="stylesheet" href="../css/style.css">
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../js/script.js"></script>
     
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
 </head>
 <body id="dashboardPage">
+    
     <?php include 'client_header.php'; ?>
     
     <div class="client-dashboard-wrapper">
@@ -91,26 +97,23 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                             <?php else: ?>
                                 <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
+                                    <table class="table table-hover align-middle">
+                                        <thead class="table-light">
                                             <tr>
-                                                <th>Date & Time</th>
                                                 <th>Service</th>
+                                                <th>Date</th>
+                                                <th>Time</th>
                                                 <th>Status</th>
-                                                <th>Actions</th>
+                                                <th class="text-center">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <?php foreach ($appointments as $appointment): ?>
                                                 <tr>
-                                                    <td>
-                                                        <?php 
-                                                        $date = new DateTime($appointment['date'] . ' ' . $appointment['time']);
-                                                        echo $date->format('M d, Y h:i A'); 
-                                                        ?>
-                                                    </td>
-                                                    <td><?php echo htmlspecialchars($appointment['service']); ?></td>
-                                                    <td>
+                                                    <td style="min-width: 150px;"><?php echo htmlspecialchars($appointment['service']); ?></td>
+                                                    <td style="min-width: 120px;"><?php echo date('M d, Y', strtotime($appointment['date'])); ?></td>
+                                                    <td style="min-width: 100px;"><?php echo date('h:i A', strtotime($appointment['time'])); ?></td>
+                                                    <td style="min-width: 100px;">
                                                         <?php
                                                         $statusClass = '';
                                                         switch($appointment['status']) {
@@ -128,19 +131,42 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                                 break;
                                                         }
                                                         ?>
-                                                        <span class="badge <?php echo $statusClass; ?>">
+                                                        <span class="badge <?php echo $statusClass; ?> px-3 py-2">
                                                             <?php echo ucfirst($appointment['status']); ?>
                                                         </span>
                                                     </td>
-                                                    <td>
+                                                    <td class="text-center" style="min-width: 200px;">
                                                         <?php if ($appointment['status'] === 'pending'): ?>
-                                                            <button class="btn btn-sm btn-danger" onclick="cancelAppointment(<?php echo $appointment['appointment_id']; ?>)">
-                                                                <i class="fas fa-times"></i> Cancel
+                                                            <div class="d-flex gap-2 justify-content-center">
+                                                                <button class="btn btn-warning" 
+                                                                        onclick="rescheduleAppointment(<?php echo $appointment['appointment_id']; ?>)"
+                                                                        style="width: 120px;">
+                                                                    <i class="fas fa-calendar-alt me-2"></i>
+                                                                    Reschedule
+                                                                </button>
+                                                                <button class="btn btn-danger" 
+                                                                        onclick="cancelAppointment(<?php echo $appointment['appointment_id']; ?>)"
+                                                                        style="width: 120px;">
+                                                                    <i class="fas fa-times me-2"></i>
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                            <div class="mt-2">
+                                                                <button class="btn btn-info" 
+                                                                        onclick="viewDetails(<?php echo $appointment['appointment_id']; ?>)"
+                                                                        style="width: 120px;">
+                                                                    <i class="fas fa-eye me-2"></i>
+                                                                    View
+                                                                </button>
+                                                            </div>
+                                                        <?php else: ?>
+                                                            <button class="btn btn-info" 
+                                                                    onclick="viewDetails(<?php echo $appointment['appointment_id']; ?>)"
+                                                                    style="width: 120px;">
+                                                                <i class="fas fa-eye me-2"></i>
+                                                                View
                                                             </button>
                                                         <?php endif; ?>
-                                                        <button class="btn btn-sm btn-info" onclick="viewDetails(<?php echo $appointment['appointment_id']; ?>)">
-                                                            <i class="fas fa-eye"></i> View
-                                                        </button>
                                                     </td>
                                                 </tr>
                                             <?php endforeach; ?>
@@ -170,47 +196,84 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../js/script.js"></script>
-    <script>
-        function cancelAppointment(appointmentId) {
-            if (confirm('Are you sure you want to cancel this appointment?')) {
-                fetch('cancel_appointment.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: 'appointment_id=' + appointmentId
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert(data.message || 'Error cancelling appointment');
-                    }
-                });
-            }
-        }
+    <!-- PIN Verification Modal -->
+    <div class="modal fade" id="pinVerificationModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Enter PIN to Cancel</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-center mb-4">Please enter your 4-digit PIN code to confirm cancellation.</p>
+                    <div class="pin-input-group">
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                    </div>
+                    <input type="hidden" id="appointmentToCancel">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmCancellation">Confirm Cancellation</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        function viewDetails(appointmentId) {
-            fetch('get_appointment_details.php?id=' + appointmentId)
-                .then(response => response.json())
-                .then(data => {
-                    const modal = new bootstrap.Modal(document.getElementById('appointmentDetailsModal'));
-                    document.querySelector('#appointmentDetailsModal .modal-body').innerHTML = `
-                        <div class="appointment-details">
-                            <p><strong>Date:</strong> ${data.date}</p>
-                            <p><strong>Time:</strong> ${data.time}</p>
-                            <p><strong>Service:</strong> ${data.service}</p>
-                            <p><strong>Status:</strong> <span class="badge bg-${data.statusClass}">${data.status}</span></p>
-                            <p><strong>Booked on:</strong> ${data.created_at}</p>
-                        </div>
-                    `;
-                    modal.show();
-                });
-        }
-    </script>
+    <!-- Reschedule Modal -->
+    <div class="modal fade" id="rescheduleModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Reschedule Appointment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-center mb-4">Please select a new date and time for your appointment.</p>
+                    <div class="mb-3">
+                        <label class="form-label">New Date</label>
+                        <input type="date" class="form-control" id="newDate" min="<?php echo date('Y-m-d'); ?>" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">New Time</label>
+                        <input type="time" class="form-control" id="newTime" required>
+                    </div>
+                    <input type="hidden" id="appointmentToReschedule">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmReschedule">Confirm Reschedule</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PIN Verification Modal for Reschedule -->
+    <div class="modal fade" id="pinVerificationRescheduleModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Enter PIN to Reschedule</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-center mb-4">Please enter your 4-digit PIN code to confirm rescheduling.</p>
+                    <div class="pin-input-group">
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmPinReschedule">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html> 

@@ -36,14 +36,14 @@ function handlePasswordToggles(selector = 'input[type="password"]:not(.pin-input
     const passwordFields = document.querySelectorAll(selector);
     passwordFields.forEach(field => {
         // Skip if the field already has a toggle button
-        if (field.parentElement.querySelector('.password-toggle')) {
+        if (field.parentElement.querySelector('.ebtc-password-toggle')) {
             return;
         }
 
         // Create and add toggle button
         const toggleBtn = document.createElement('button');
         toggleBtn.type = 'button';
-        toggleBtn.className = 'btn btn-link password-toggle';
+        toggleBtn.className = 'btn btn-link ebtc-password-toggle';
         toggleBtn.innerHTML = '<i class="fa-solid fa-eye" style="color: #000000;"></i>';
         
         // Add the button in a relative positioned container
@@ -215,6 +215,23 @@ function handleRegisterPage() {
             matchIndicator.innerHTML = '';
         }
     }
+
+    // Add password visibility toggle
+    const passwordFields = document.querySelectorAll('input[type="password"]');
+    if (passwordFields) {
+        passwordFields.forEach(passwordField => {
+            const toggleBtn = document.createElement('button');
+            toggleBtn.type = 'button';
+            toggleBtn.className = 'btn btn-link ebtc-password-toggle';
+            toggleBtn.innerHTML = '<i class="fa-solid fa-eye" style="color: #000000;"></i>';
+            passwordField.parentElement.appendChild(toggleBtn);
+            toggleBtn.addEventListener('click', function() {
+                const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordField.setAttribute('type', type);
+                this.innerHTML = type === 'password' ? '<i class="fa-solid fa-eye" style="color: #000000;"></i>' : '<i class="fa-solid fa-eye-slash" style="color: #000000;"></i>';
+            });
+        });
+    }
 }
 
 // Login page functions
@@ -229,7 +246,7 @@ function handleLoginPage() {
     if (passwordField) {
         const toggleBtn = document.createElement('button');
         toggleBtn.type = 'button';
-        toggleBtn.className = 'btn btn-link password-toggle';
+        toggleBtn.className = 'btn btn-link ebtc-password-toggle';
         toggleBtn.innerHTML = '<i class="fa-solid fa-eye" style="color: #000000;"></i>';
         passwordField.parentElement.appendChild(toggleBtn);
 
@@ -246,6 +263,22 @@ function handleAdminLoginPage() {
     const adminLoginForm = document.querySelector('form');
     if (adminLoginForm) {
         adminLoginForm.addEventListener('submit', validateLoginForm);
+    }
+
+    // Add password visibility toggle
+    const passwordField = document.querySelector('input[type="password"]');
+    if (passwordField) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'btn btn-link ebtc-password-toggle';
+        toggleBtn.innerHTML = '<i class="fa-solid fa-eye" style="color: #000000;"></i>';
+        passwordField.parentElement.appendChild(toggleBtn);
+
+        toggleBtn.addEventListener('click', function() {
+            const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordField.setAttribute('type', type);
+            this.innerHTML = type === 'password' ? '<i class="fa-solid fa-eye" style="color: #000000;"></i>' : '<i class="fa-solid fa-eye-slash" style="color: #000000;"></i>';
+        });
     }
 }
 
@@ -1036,3 +1069,34 @@ function handleSettingsPage() {
         document.getElementById('verificationCode').value = '';
     });
 }
+
+// Sidebar Toggle Functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const headerToggleBtn = document.getElementById('headerSidebarToggle');
+    if (headerToggleBtn) {
+        headerToggleBtn.addEventListener('click', function() {
+            const sidebar = document.querySelector('.client-sidebar, .admin-sidebar');
+            const mainContent = document.querySelector('.client-main-content, .admin-main-content');
+            
+            if (sidebar && mainContent) {
+                sidebar.classList.toggle('collapsed');
+                mainContent.classList.toggle('expanded');
+                
+                // Store the state in localStorage
+                const isCollapsed = sidebar.classList.contains('collapsed');
+                localStorage.setItem('sidebarCollapsed', isCollapsed);
+            }
+        });
+
+        // Check localStorage on page load
+        const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+        if (isCollapsed) {
+            const sidebar = document.querySelector('.client-sidebar, .admin-sidebar');
+            const mainContent = document.querySelector('.client-main-content, .admin-main-content');
+            if (sidebar && mainContent) {
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('expanded');
+            }
+        }
+    }
+});

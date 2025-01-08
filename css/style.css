@@ -1,167 +1,145 @@
-/* Client Dashboard Sidebar Styles */
-.client-dashboard-wrapper {
-    display: flex;
+/* Global Styles - Used in multiple files */
+body {
     min-height: 100vh;
-    padding-top: 80px;
-}
-
-.client-sidebar {
-    width: 250px;
-    background: #235347;
-    color: white;
-    position: fixed;
-    height: calc(100vh - 80px); /* Subtract header height */
-    left: 0;
-    top: 80px; /* Start below header */
-    z-index: 999;
-    transition: all 0.3s ease;
-    overflow-y: auto;
-}
-
-.client-sidebar-header {
-    display: none; /* Hide the duplicate logo since it's in the header */
-}
-
-.client-sidebar-menu {
-    padding: 20px 0;
-}
-
-.client-sidebar-menu a {
-    padding: 12px 20px;
-    color: white;
     display: flex;
-    align-items: center;
-    text-decoration: none;
+    flex-direction: column;
+}
+
+.container-fluid {
+    flex: 1 0 auto;
+}
+
+.btn {
     transition: all 0.3s ease;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    border-radius: 6px;
 }
 
-.client-sidebar-menu a:hover,
-.client-sidebar-menu a.active {
-    background: #00A36C;
-    border-left: 4px solid white;
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
-.client-sidebar-menu a i {
-    margin-right: 10px;
-    width: 20px;
-    text-align: center;
+.btn i {
+    font-size: 0.875rem;
 }
 
-.client-main-content {
-    flex: 1;
-    margin-left: 250px;
-    padding: 20px;
-    background-color: #f8f9fa;
-    min-height: calc(100vh - 80px);
+.card {
+    border: none;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+    border-radius: 10px;
 }
 
-.client-user-info {
-    padding: 20px;
-    text-align: center;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+.card-title {
+    font-weight: 600;
+    color: #2c3e50;
 }
 
-.client-user-info img {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    margin-bottom: 10px;
+.card-body {
+    padding: 1.5rem;
 }
 
-.client-user-info h6 {
-    margin: 0;
-    color: white;
+.img-fluid {
+    border-radius: 10px;
 }
 
-.client-user-info small {
-    color: rgba(255,255,255,0.7);
+/* Form Styles - Used in multiple files */
+.form-floating {
+    position: relative;
 }
 
-/* Responsive styles for client dashboard */
-@media (max-width: 768px) {
-    .client-header {
-        height: 60px;
-    }
-
-    .client-header .navbar {
-        height: 60px;
-    }
-
-    .client-header .header-logo {
-        height: 40px;
-    }
-
-    .client-dashboard-wrapper {
-        padding-top: 60px;
-    }
-
-    .client-sidebar {
-        margin-left: -250px;
-        top: 60px;
-        height: calc(100vh - 60px);
-    }
-
-    .client-sidebar.active {
-        margin-left: 0;
-    }
-
-    .client-main-content {
-        margin-left: 0;
-    }
-
-    .client-main-content.active {
-        margin-left: 250px;
-    }
+.form-floating > label {
+    padding: 1rem 0.75rem;
+    height: auto;
+    line-height: 1.25;
+    transform-origin: 0 0;
+    transition: opacity .1s ease-in-out,transform .1s ease-in-out;
 }
 
-/* Activity Feed Styles */
-.activity-feed {
+.form-floating > .form-control {
+    padding: 1rem 0.75rem;
+    height: calc(3.5rem + 2px);
+    line-height: 1.25;
+}
+
+.form-floating > .form-control:focus,
+.form-floating > .form-control:not(:placeholder-shown) {
+    padding-top: 1.625rem;
+    padding-bottom: 0.625rem;
+}
+
+.form-floating > .form-control:focus ~ label,
+.form-floating > .form-control:not(:placeholder-shown) ~ label {
+    opacity: 0.65;
+    transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+    background-color: transparent;
+}
+
+.form-control:focus {
+    border-color: #235347;
+    box-shadow: 0 0 0 0.25rem rgba(35, 83, 71, 0.25);
+}
+
+/* Password Input Styles - Used in login.php, register.php, admin_login.php */
+.ebtc-password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 20%;
+    z-index: 10;
     padding: 0;
+    margin: 0;
+    cursor: pointer;
 }
 
-.activity-item {
-    padding: 10px 0;
-    border-bottom: 1px solid #eee;
+.form-floating input[type="password"] {
+    padding-right: 40px !important;
 }
 
-.activity-item:last-child {
-    border-bottom: none;
-}
-
-.activity-item i {
-    margin-right: 10px;
-}
-
-.activity-item small {
-    display: block;
-    margin-left: 24px;
-}
-
-/* Header Styles */
-.login-header {
-    position: fixed;
-    top: 0;
+/* register.php */
+.password-strength {
+    position: absolute;
     left: 0;
-    right: 0;
-    z-index: 1000;
+    bottom: -40px;
+    width: 100%;
+    z-index: 5;
+}
+
+.password-match {
+    position: absolute;
+    left: 0;
+    bottom: -40px;
+    width: 100%;
+    z-index: 5;
+}
+
+#confirm_password {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+/* header.php */
+.login-header, .client-header {
     background-color: #235347;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 1001;
+    height: 60px;
 }
 
-/* Update container padding */
-.login-header .container {
-    margin-top: 0;
-    margin-bottom: 0;
+.client-header .navbar-brand {
+    margin-left: 220px;
 }
 
-.login-header .container .py-3 {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.5rem !important;
+.client-header {
+    z-index: 1001;
 }
 
-/* Separate class for header logo */
 .header-logo {
-    height: 100px;
+    height: 60px;
     width: auto;
 }
 
@@ -171,33 +149,168 @@
     font-weight: 600;
 }
 
-/* Add these to your header styles section */
-.login-header a {
-    color: white;
+/* navbar.php */
+.navbar {
+    background-color: #235347;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 0;
+    min-height: 60px;
 }
 
-.login-header a:hover {
-    color: #8EB69B;
+.navbar-brand img {
+    height: 60px;
+    padding: 5px 0;
+}
+
+.navbar-brand p {
+    font-size: 1rem;
+}
+
+.navbar-dark .navbar-nav .nav-link {
+    color: rgba(255,255,255,0.8);
+    padding: 1rem;
     transition: color 0.3s ease;
 }
 
-/* Update the admin login button for better contrast */
-.login-header .btn-outline-secondary {
+.navbar-dark .navbar-nav .nav-link:hover {
+    color: #8EB69B;
+}
+
+/* client_dashboard.php */
+.client-dashboard-wrapper {
+    display: flex;
+    min-height: 100vh;
+    padding-top: 60px;
+}
+
+.client-sidebar {
+    width: 220px;
+    background: #235347;
     color: white;
-    border-color: white;
+    position: fixed;
+    height: calc(100vh - 60px);
+    left: 0;
+    top: 60px;
+    z-index: 999;
+    transition: all 0.3s ease;
+    overflow-y: auto;
+    padding-top: 100px;
 }
 
-.login-header .btn-outline-secondary:hover {
-    background-color: white;
-    color: #235347;
+.client-main-content {
+    flex: 1;
+    margin-left: 220px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    min-height: 100vh;
 }
 
-/* Footer Styles */
+.client-sidebar-menu a {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+}
+
+.client-sidebar-menu a:hover,
+.client-sidebar-menu a.active {
+    color: white;
+    background: rgba(255,255,255,0.1);
+}
+
+.client-sidebar-menu a i {
+    width: 20px;
+    margin-right: 10px;
+    font-size: 0.9rem;
+}
+
+/* profile.php */
+.profile-photo {
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #235347;
+}
+
+.profile-photo-upload {
+    position: relative;
+    display: inline-block;
+}
+
+.profile-photo-upload .upload-icon {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: #235347;
+    color: white;
+    padding: 8px;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+/* PIN Input Styles - Used in multiple files */
+.pin-input-group {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.pin-input {
+    width: 45px;
+    height: 45px;
+    text-align: center;
+    font-size: 20px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: #f8f9fa;
+    transition: border-color 0.3s;
+}
+
+.pin-input:focus {
+    border-color: #0d6efd;
+    outline: none;
+    box-shadow: none;
+}
+
+/* Table Styles - Used in multiple files */
+.table {
+    margin-bottom: 0;
+}
+
+.table th {
+    font-weight: 600;
+    padding: 1rem;
+}
+
+.table td {
+    padding: 0.75rem;
+    vertical-align: middle;
+}
+
+.table-responsive {
+    border-radius: 8px;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.table td .d-flex.gap-2 {
+    gap: 0.25rem !important;
+}
+
+/* footer.php */
 .footer {
     background-color: #235347;
     color: white;
     padding: 1.5rem 0;
     width: 100%;
+    flex-shrink: 0;
 }
 
 .footer p {
@@ -227,110 +340,14 @@
     color: #8EB69B;
 }
 
-.footer .social-links a {
-    color: white;
-    font-size: 1.2rem;
-    opacity: 0.8;
-    transition: opacity 0.3s ease;
-}
-
-.footer .social-links a:hover {
-    opacity: 1;
-    color: #8EB69B;
-}
-
-/* Ensure footer stays at bottom */
-body {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
-
-.container-fluid {
-    flex: 1 0 auto;
-}
-
-.footer {
-    flex-shrink: 0;
-}
-
-/* Add a divider style for the footer */
 .footer hr {
     border-color: rgba(255, 255, 255, 0.1);
     margin: 2rem 0 1rem;
 }
 
-/* Update/Add these navbar styles */
-.navbar {
-    background-color: #235347;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    padding: 0;
-}
-
-.navbar-brand img {
-    height: 120px;
-    padding: 10px 0;
-}
-
-.navbar-dark .navbar-nav .nav-link {
-    color: rgba(255,255,255,0.8);
-    padding: 1rem;
-    transition: color 0.3s ease;
-}
-
-.navbar-dark .navbar-nav .nav-link:hover {
-    color: #8EB69B;
-}
-
-.navbar .dropdown-menu {
-    background-color: white;
-    border: none;
-    box-shadow: 0 2px 15px rgba(0,0,0,0.1);
-}
-
-.navbar .dropdown-item {
-    padding: 0.7rem 1.5rem;
-    transition: all 0.3s ease;
-}
-
-.navbar .dropdown-item:hover {
-    background-color: #f8fff9;
-    color: #00A36C;
-}
-
-.navbar .btn-outline-light {
-    border-width: 2px;
-}
-
-.navbar .btn-outline-light:hover {
-    background-color: white;
-    color: #235347;
-}
-
-/* Remove any fixed-top related styles */
-.navbar.fixed-top {
-    position: relative;
-}
-
-/* Responsive adjustments */
-@media (max-width: 991px) {
-    .navbar-collapse {
-        padding: 1rem 0;
-    }
-    
-    .navbar-nav {
-        padding: 1rem 0;
-        border-top: 1px solid rgba(255,255,255,0.1);
-    }
-    
-    .navbar .btn-outline-light {
-        margin: 0.5rem 0;
-    }
-}
-
-/* Hero Section Styles */
+/* index.php Styles */
 .hero {
-    background-color: #f8f9fa;
+    background: linear-gradient(rgba(35, 83, 71, 0.05), rgba(35, 83, 71, 0.1));
     min-height: 100vh;
     display: flex;
     align-items: center;
@@ -339,332 +356,411 @@ body {
 
 .hero h1 {
     color: #235347;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
 }
 
-.hero .btn-lg {
+.hero p {
+    color: #666;
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+}
+
+.hero .btn-primary {
+    background-color: #00A36C;
+    border-color: #00A36C;
     padding: 1rem 2rem;
     font-size: 1.1rem;
+    transition: all 0.3s ease;
 }
 
-/* Services Section Styles */
+.hero .btn-primary:hover {
+    background-color: #235347;
+    border-color: #235347;
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 163, 108, 0.3);
+}
+
 .service-card {
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
     border: none;
-    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
+    border-radius: 15px;
+    overflow: hidden;
+    background: white;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
 }
 
 .service-card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-10px);
+    box-shadow: 0 15px 30px rgba(35, 83, 71, 0.1);
 }
 
 .service-icon {
-    font-size: 3rem;
+    font-size: 3.5rem;
     color: #00A36C;
+    margin-bottom: 1.5rem;
 }
 
 .service-card .card-title {
     color: #235347;
     font-size: 1.5rem;
+    font-weight: 600;
     margin-bottom: 1rem;
 }
 
-.service-card ul li {
-    margin-bottom: 0.5rem;
+.service-card .card-text {
     color: #666;
+    margin-bottom: 1.5rem;
+}
+
+.service-card ul li {
+    color: #666;
+    margin-bottom: 0.8rem;
+    position: relative;
+    padding-left: 1.5rem;
 }
 
 .service-card ul li:before {
     content: "•";
     color: #00A36C;
     font-weight: bold;
-    display: inline-block;
-    width: 1em;
-    margin-left: -1em;
+    position: absolute;
+    left: 0;
 }
 
-/* About Section Styles */
-.about-section {
+#about {
     background-color: #f8f9fa;
-    padding: 80px 0;
 }
 
-.about-section h2 {
+#about h2 {
     color: #235347;
+    font-weight: 700;
     margin-bottom: 2rem;
 }
 
-.about-section .check-item {
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
+#about .lead {
+    color: #666;
+    line-height: 1.8;
 }
 
-.about-section .check-item i {
+#about .fas.fa-check-circle {
     color: #00A36C;
-    margin-right: 10px;
+    font-size: 1.2rem;
 }
 
-/* Contact Section Styles */
-.contact-section {
-    padding: 80px 0;
+.contact-form .form-control {
+    border: 2px solid #e9ecef;
+    padding: 0.8rem;
+    border-radius: 8px;
 }
 
-.contact-section h2 {
+.contact-form .form-control:focus {
+    border-color: #00A36C;
+    box-shadow: 0 0 0 0.25rem rgba(0, 163, 108, 0.25);
+}
+
+.contact-info i {
+    color: #00A36C;
+    font-size: 1.5rem;
+    width: 40px;
+}
+
+/* Book Appointment Section */
+#book-appointment .card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(35, 83, 71, 0.1);
+}
+
+#book-appointment .card-body {
+    padding: 3rem;
+}
+
+#book-appointment h4 {
     color: #235347;
-    margin-bottom: 2rem;
+    font-weight: 600;
 }
 
-/* AOS Animation Styles */
-[data-aos] {
-    pointer-events: none;
-}
-
-[data-aos].aos-animate {
-    pointer-events: auto;
-}
-
-/* Responsive Styles */
-@media (max-width: 768px) {
-    .hero {
-        padding: 80px 0;
-        text-align: center;
-    }
-
-    .hero img {
-        margin-top: 2rem;
-    }
-
-    .service-card {
-        margin-bottom: 2rem;
-    }
-}
-
-/* Section Spacing */
-section {
-    padding: 100px 0;
-}
-
-section h2 {
-    margin-bottom: 3rem;
-}
-
-/* Image Styles */
-.img-fluid {
-    border-radius: 10px;
-}
-
-/* Button Hover Effects */
-.btn {
+#book-appointment .btn-primary {
+    background-color: #00A36C;
+    border-color: #00A36C;
+    padding: 1rem 2rem;
+    font-weight: 500;
     transition: all 0.3s ease;
 }
 
-.btn:hover {
-    transform: translateY(-2px);
+#book-appointment .btn-primary:hover {
+    background-color: #235347;
+    border-color: #235347;
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 163, 108, 0.3);
+}
+
+/* Map Container */
+.map-container {
+    border-radius: 15px;
+    overflow: hidden;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    margin-top: 2rem;
 }
 
-/* Password Toggle Button Styles */
-.form-floating {
-    position: relative;
+.map-container iframe {
+    width: 100%;
+    height: 300px;
+    border: 0;
 }
 
-.password-toggle {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 10;
-    background: none;
-    border: none;
-    padding: 0;
-    margin: 0;
-    cursor: pointer;
+/* Admin Dashboard Styles */
+.admin-dashboard-wrapper {
+    display: flex;
+    min-height: 100vh;
+    padding-top: 60px;
 }
 
-.password-toggle:focus {
-    outline: none;
-    box-shadow: none;
-}
-
-/* Adjust input padding to prevent text overlap with icon */
-.form-floating input[type="password"] {
-    padding-right: 40px;
-}
-
-/* Remove default button styles */
-.btn-link.password-toggle {
-    text-decoration: none;
-}
-
-.btn-link.password-toggle:hover {
-    text-decoration: none;
-    transform: translateY(-50%);
-}
-
-/* Client Header Styles */
-.client-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 1000;
+.admin-header {
     background-color: #235347;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    height: 80px;
-}
-
-.client-header .navbar {
-    height: 80px;
-    padding: 0;
-    background-color: transparent;
-}
-
-.client-header .header-logo {
-    height: 60px;
-    width: auto;
-    padding: 0;
-}
-
-.client-header .nav-link {
-    color: white !important;
-    padding: 0.5rem 1rem;
-}
-
-.client-header .nav-link:hover {
-    color: #8EB69B !important;
-}
-
-.client-header .dropdown-menu {
-    margin-top: 0.5rem;
-    border: none;
-    box-shadow: 0 2px 15px rgba(0,0,0,0.1);
-}
-
-/* Profile Page Styles */
-.profile-photo {
-    width: 150px;
-    height: 150px;
-    object-fit: cover;
-    border-radius: 50%;
-    border: 3px solid #235347;
-}
-
-.profile-photo-upload {
-    position: relative;
-    display: inline-block;
-}
-
-.profile-photo-upload .upload-icon {
-    position: absolute;
-    bottom: 0;
+    position: fixed;
+    top: 0;
     right: 0;
+    left: 0;
+    z-index: 1001;
+    height: 60px;
+}
+
+.admin-header .navbar-brand {
+    margin-left: 220px;
+}
+
+.admin-sidebar {
+    width: 220px;
     background: #235347;
     color: white;
-    padding: 8px;
-    border-radius: 50%;
-    cursor: pointer;
+    position: fixed;
+    height: calc(100vh - 60px);
+    left: 0;
+    top: 60px;
+    z-index: 999;
+    transition: all 0.3s ease;
+    overflow-y: auto;
 }
 
-.readonly-field {
+.admin-main-content {
+    flex: 1;
+    margin-left: 220px;
+    padding: 20px;
     background-color: #f8f9fa;
-    cursor: not-allowed;
+    min-height: 100vh;
 }
 
-/* PIN Input Styles */
-.pin-input-group {
+.admin-sidebar-menu a {
     display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+}
+
+.admin-sidebar-menu a:hover,
+.admin-sidebar-menu a.active {
+    color: white;
+    background: rgba(255,255,255,0.1);
+}
+
+.admin-sidebar-menu a i {
+    width: 20px;
+    margin-right: 10px;
+    font-size: 0.9rem;
+}
+
+.card-icon {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
     justify-content: center;
-    gap: 10px;
-    margin: 20px 0;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
 }
 
-.pin-input {
-    width: 45px;
-    height: 45px;
-    text-align: center;
-    font-size: 20px;
-    border: 2px solid #ddd;
-    border-radius: 8px;
-    background: #f8f9fa;
-    transition: border-color 0.3s;
+/* Sidebar Toggle Button */
+.sidebar-toggle {
+    padding: 0;
+    font-size: 1.5rem;
+    line-height: 1;
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    position: relative;
+    z-index: 1002;
 }
 
-.pin-input:focus {
-    border-color: #0d6efd;
-    outline: none;
+.sidebar-toggle:hover {
+    transform: scale(1.1);
+}
+
+.sidebar-toggle:focus {
     box-shadow: none;
 }
 
-/* Verification Code Input Styles */
-.verification-digit {
-    width: 45px !important;
-    height: 45px;
-    font-size: 1.2rem;
-    border-radius: 8px;
+/* Update client sidebar for toggle */
+.client-sidebar {
+    width: 220px;
+    background: #235347;
+    color: white;
+    position: fixed;
+    height: 100vh;
+    left: 0;
+    top: 0;
+    z-index: 999;
+    transition: all 0.3s ease;
+    overflow-y: auto;
 }
 
-/* Add these styles to your existing CSS */
-.table {
-    margin-bottom: 0;
+.client-sidebar.collapsed {
+    transform: translateX(-100%);
 }
 
-.table th {
-    font-weight: 600;
-    padding: 1rem;
+.client-main-content {
+    flex: 1;
+    margin-left: 220px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    transition: margin-left 0.3s ease;
 }
 
-.table td {
-    padding: 1rem;
+.client-main-content.expanded {
+    margin-left: 0;
+}
+
+.client-header .navbar-brand {
+    margin-left: 0;
+    transition: margin-left 0.3s ease;
+}
+
+/* Update admin sidebar for consistency */
+.admin-sidebar {
+    width: 220px;
+    background: #235347;
+    color: white;
+    position: fixed;
+    height: 100vh;
+    left: 0;
+    top: 0;
+    z-index: 999;
+    transition: all 0.3s ease;
+    overflow-y: auto;
+    padding-top: 100px;
+}
+
+.admin-sidebar.collapsed {
+    transform: translateX(-100%);
+}
+
+.admin-main-content {
+    flex: 1;
+    margin-left: 220px;
+    padding: 50px 20px 20px 20px;
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    transition: margin-left 0.3s ease;
+}
+
+.admin-main-content.expanded {
+    margin-left: 0;
+}
+
+.admin-header .navbar-brand {
+    margin-left: 0;
+    transition: margin-left 0.3s ease;
+}
+
+@media (max-width: 768px) {
+    .login-header, .client-header, .admin-header {
+        left: 0;
+    }
+
+    .client-header .navbar-brand,
+    .admin-header .navbar-brand {
+        margin-left: 0;
+    }
+
+    .client-sidebar {
+        transform: translateX(-100%);
+        top: 60px;
+        height: calc(100vh - 60px);
+    }
+    
+    .client-sidebar.active {
+        transform: translateX(0);
+    }
+    
+    .client-main-content {
+        margin-left: 0;
+    }
+    
+    .client-main-content.active {
+        margin-left: 220px;
+    }
+
+    .admin-sidebar {
+        transform: translateX(-100%);
+        top: 60px;
+        height: calc(100vh - 60px);
+    }
+    
+    .admin-sidebar.active {
+        transform: translateX(0);
+    }
+    
+    .admin-main-content {
+        margin-left: 0;
+    }
+    
+    .admin-main-content.active {
+        margin-left: 220px;
+    }
+
+    .client-main-content,
+    .admin-main-content {
+        margin-left: 0;
+    }
+}
+
+/* Action Button Styles */
+.btn-action {
+    padding: 0.15rem 0.3rem;
+    width: 130px;
+    display: block;
+    text-align: center;
+    border-radius: 3px;
+}
+
+.btn-action h1 {
+    margin: 0;
+    padding: 0;
+    font-size: .8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    color: white;
+}
+
+.action-buttons-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.table td.actions-cell {
+    min-width: 120px;
+    padding: 0.5rem;
     vertical-align: middle;
-}
-
-.badge {
-    font-weight: 500;
-    font-size: 0.875rem;
-    letter-spacing: 0.3px;
-}
-
-.btn {
-    padding: 0.5rem 1rem;
-    font-weight: 500;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-}
-
-.btn i {
-    font-size: 0.875rem;
-}
-
-.btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.card {
-    border: none;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
-    border-radius: 10px;
-}
-
-.card-title {
-    font-weight: 600;
-    color: #2c3e50;
-}
-
-.table-responsive {
-    border-radius: 8px;
-}
-
-.table-hover tbody tr:hover {
-    background-color: rgba(0, 0, 0, 0.02);
-}
-
-/* Improve spacing in action buttons */
-.d-flex.gap-2 {
-    gap: 0.75rem !important;
-}
-
-/* Add some padding to the card */
-.card-body {
-    padding: 1.5rem;
 }

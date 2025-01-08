@@ -135,36 +135,26 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                             <?php echo ucfirst($appointment['status']); ?>
                                                         </span>
                                                     </td>
-                                                    <td class="text-center" style="min-width: 200px;">
+                                                    <td class="text-center actions-cell">
                                                         <?php if ($appointment['status'] === 'pending'): ?>
-                                                            <div class="d-flex gap-2 justify-content-center">
-                                                                <button class="btn btn-warning" 
-                                                                        onclick="rescheduleAppointment(<?php echo $appointment['appointment_id']; ?>)"
-                                                                        style="width: 120px;">
-                                                                    <i class="fas fa-calendar-alt me-2"></i>
-                                                                    Reschedule
+                                                            <div class="action-buttons-wrapper">
+                                                                <button class="btn btn-secondary btn-action" 
+                                                                        onclick="rescheduleAppointment(<?php echo $appointment['appointment_id']; ?>)">
+                                                                    <h1>Reschedule</h1>
                                                                 </button>
-                                                                <button class="btn btn-danger" 
-                                                                        onclick="cancelAppointment(<?php echo $appointment['appointment_id']; ?>)"
-                                                                        style="width: 120px;">
-                                                                    <i class="fas fa-times me-2"></i>
-                                                                    Cancel
+                                                                <button class="btn btn-danger btn-action" 
+                                                                        onclick="cancelAppointment(<?php echo $appointment['appointment_id']; ?>)">
+                                                                    <h1>Cancel</h1>
                                                                 </button>
-                                                            </div>
-                                                            <div class="mt-2">
-                                                                <button class="btn btn-info" 
-                                                                        onclick="viewDetails(<?php echo $appointment['appointment_id']; ?>)"
-                                                                        style="width: 120px;">
-                                                                    <i class="fas fa-eye me-2"></i>
-                                                                    View
+                                                                <button class="btn btn-info btn-action" 
+                                                                        onclick="viewDetails(<?php echo $appointment['appointment_id']; ?>)">
+                                                                    <h1>View</h1>
                                                                 </button>
                                                             </div>
                                                         <?php else: ?>
-                                                            <button class="btn btn-info" 
-                                                                    onclick="viewDetails(<?php echo $appointment['appointment_id']; ?>)"
-                                                                    style="width: 120px;">
-                                                                <i class="fas fa-eye me-2"></i>
-                                                                View
+                                                            <button class="btn btn-info btn-action" 
+                                                                    onclick="viewDetails(<?php echo $appointment['appointment_id']; ?>)">
+                                                                <h1>View</h1>
                                                             </button>
                                                         <?php endif; ?>
                                                     </td>

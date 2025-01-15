@@ -63,6 +63,10 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
             <i class="fas fa-calendar-check"></i>
             Appointments
         </a>
+        <a href="projects.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'project.php' ? 'active' : ''; ?>">
+            <i class="fa-solid fa-diagram-project"></i>
+            Projects
+        </a>
         <a href="users.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'users.php' ? 'active' : ''; ?>">
             <i class="fas fa-users"></i>
             Users

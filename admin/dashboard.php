@@ -7,6 +7,38 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
     header('Location: ../admin_login.php');
     exit;
 }
+
+// Get total users (clients)
+$stmt = $pdo->prepare("SELECT COUNT(*) as total_users FROM users WHERE role = 'client'");
+$stmt->execute();
+$total_users = $stmt->fetch(PDO::FETCH_ASSOC)['total_users'];
+
+// Get total employees (non-clients)
+$stmt = $pdo->prepare("SELECT COUNT(*) as total_employees FROM users WHERE role != 'client'");
+$stmt->execute();
+$total_employees = $stmt->fetch(PDO::FETCH_ASSOC)['total_employees'];
+
+// Get total appointments
+$stmt = $pdo->prepare("SELECT COUNT(*) as total_appointments FROM appointments");
+$stmt->execute();
+$total_appointments = $stmt->fetch(PDO::FETCH_ASSOC)['total_appointments'];
+
+// Get pending appointments
+$stmt = $pdo->prepare("SELECT COUNT(*) as pending_requests FROM appointments WHERE status = 'pending'");
+$stmt->execute();
+$pending_requests = $stmt->fetch(PDO::FETCH_ASSOC)['pending_requests'];
+
+// Get recent appointments (last 7 days)
+$stmt = $pdo->prepare("
+    SELECT a.*, u.name as client_name 
+    FROM appointments a 
+    JOIN users u ON a.client_id = u.user_id 
+    WHERE a.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+    ORDER BY a.created_at DESC
+    LIMIT 10
+");
+$stmt->execute();
+$recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -68,7 +100,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="card-title mb-1">Total Users</h6>
-                                    <h2 class="mb-0">150</h2>
+                                    <h2 class="mb-0"><?php echo $total_users; ?></h2>
                                 </div>
                                 <div class="card-icon">
                                     <i class="fas fa-users fa-2x"></i>
@@ -83,7 +115,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="card-title mb-1">Total Appointments</h6>
-                                    <h2 class="mb-0">48</h2>
+                                    <h2 class="mb-0"><?php echo $total_appointments; ?></h2>
                                 </div>
                                 <div class="card-icon">
                                     <i class="fas fa-calendar-check fa-2x"></i>
@@ -98,7 +130,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="card-title mb-1">Total Employees</h6>
-                                    <h2 class="mb-0">25</h2>
+                                    <h2 class="mb-0"><?php echo $total_employees; ?></h2>
                                 </div>
                                 <div class="card-icon">
                                     <i class="fas fa-user-tie fa-2x"></i>
@@ -113,7 +145,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="card-title mb-1">Pending Requests</h6>
-                                    <h2 class="mb-0">12</h2>
+                                    <h2 class="mb-0"><?php echo $pending_requests; ?></h2>
                                 </div>
                                 <div class="card-icon">
                                     <i class="fas fa-clock fa-2x"></i>
@@ -140,20 +172,43 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
                                             <th>Service</th>
                                             <th>Date</th>
                                             <th>Status</th>
-                                            <th>Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <!-- Add sample data or fetch from database -->
-                                        <tr>
-                                            <td>John Doe</td>
-                                            <td>Consultation</td>
-                                            <td>Mar 15, 2024</td>
-                                            <td><span class="badge bg-warning">Pending</span></td>
-                                            <td>
-                                                <button class="btn btn-sm btn-info">View</button>
-                                            </td>
-                                        </tr>
+                                        <?php foreach ($recent_appointments as $appointment): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($appointment['client_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($appointment['service']); ?></td>
+                                                <td><?php echo date('M d, Y', strtotime($appointment['date'])) . ' ' . date('h:i A', strtotime($appointment['time'])); ?></td>
+                                                <td>
+                                                    <?php
+                                                        $statusClass = '';
+                                                        switch($appointment['status']) {
+                                                            case 'pending':
+                                                                $statusClass = 'bg-warning';
+                                                                break;
+                                                            case 'confirmed':
+                                                                $statusClass = 'bg-success';
+                                                                break;
+                                                            case 'cancelled':
+                                                                $statusClass = 'bg-danger';
+                                                                break;
+                                                            case 'archived':
+                                                                $statusClass = 'bg-dark';
+                                                                break;
+                                                            default:
+                                                                $statusClass = '';
+                                                        }
+                                                    ?>
+                                                    <span class="badge <?php echo $statusClass; ?>"><?php echo ucfirst($appointment['status']); ?></span>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                        <?php if (empty($recent_appointments)): ?>
+                                            <tr>
+                                                <td colspan="4" class="text-center">No recent appointments found</td>
+                                            </tr>
+                                        <?php endif; ?>
                                     </tbody>
                                 </table>
                             </div>

@@ -24,6 +24,21 @@ document.addEventListener('DOMContentLoaded', function() {
         case 'settingsPage':
             handleSettingsPage();
             break;
+        case 'adminAppointmentsPage':
+            handleAdminAppointmentsPage();
+            break;
+        case 'adminArchivedAppointmentsPage':
+            handleAdminArchivedAppointmentsPage();
+            break;
+        case 'adminProjectsPage':
+            handleAdminProjectsPage();
+            break;
+        case 'adminUsersPage':
+            handleAdminUsersPage();
+            break;
+        case 'adminEmployeesPage':
+            handleAdminEmployeesPage();
+            break;
         // Add more cases as needed
     }
 
@@ -913,6 +928,15 @@ function handleSettingsPage() {
         toast.show();
     }
 
+    // Function to show toast message
+    function showToast(title, message, isError = false) {
+        document.getElementById('toastTitle').textContent = title;
+        document.getElementById('toastMessage').textContent = message;
+        document.getElementById('messageToast').classList.toggle('bg-danger', isError);
+        document.getElementById('messageToast').classList.toggle('text-white', isError);
+        toast.show();
+    }
+
     // Handle password change process
     const changePasswordModal = new bootstrap.Modal(document.getElementById('changePasswordModal'));
     const verificationModal = new bootstrap.Modal(document.getElementById('verificationCodeModal'));
@@ -1100,3 +1124,548 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+// Add the admin appointments page handling function
+function handleAdminAppointmentsPage() {
+    // Initialize view appointment modal
+    window.viewModal = new bootstrap.Modal(document.getElementById('viewAppointmentModal'));
+    window.currentAppointmentId = null;
+}
+
+// Confirm appointment function
+function confirmAppointment(appointmentId) {
+    fetch('../admin/confirm_appointment.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            appointment_id: appointmentId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            console.error('Server response:', data);
+            alert(data.message || 'Error confirming appointment');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error confirming appointment. Please try again.');
+    });
+}
+
+// Archive appointment function
+function archiveAppointment(appointmentId) {
+    fetch('../admin/archive_appointment.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            appointment_id: appointmentId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            console.error('Server response:', data);
+            alert(data.message || 'Error archiving appointment');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error archiving appointment. Please try again.');
+    });
+}
+
+// Function to view appointment details
+function viewAppointment(appointmentData) {
+    window.currentAppointmentId = appointmentData.appointment_id;
+
+    // Update modal content
+    document.getElementById('modalClientName').textContent = appointmentData.client_name;
+    document.getElementById('modalClientEmail').textContent = appointmentData.client_email;
+    document.getElementById('modalClientPhone').textContent = appointmentData.client_phone;
+    document.getElementById('modalService').textContent = appointmentData.service;
+    document.getElementById('modalDate').textContent = new Date(appointmentData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    document.getElementById('modalTime').textContent = new Date('1970-01-01T' + appointmentData.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    
+    // Set status with badge
+    document.getElementById('modalStatus').innerHTML = getStatusBadge(appointmentData.status);
+    
+    document.getElementById('modalCreated').textContent = new Date(appointmentData.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    // Show/hide confirm button based on status
+    const confirmButtonContainer = document.getElementById('modalConfirmButton');
+    if (appointmentData.status === 'pending') {
+        confirmButtonContainer.innerHTML = `
+            <button type="button" class="btn btn-success" onclick="confirmAppointmentFromModal()">
+                <i class="fas fa-check me-2"></i>Confirm
+            </button>
+        `;
+    } else {
+        confirmButtonContainer.innerHTML = '';
+    }
+
+    // Show/hide archive button based on status
+    const archiveButtonContainer = document.getElementById('modalArchiveButton');
+    if (appointmentData.status !== 'archived') {
+        archiveButtonContainer.style.display = 'block';
+    } else {
+        archiveButtonContainer.style.display = 'none';
+    }
+
+    // Show modal
+    window.viewModal.show();
+}
+
+// Get status badge HTML
+function getStatusBadge(status) {
+    const badges = {
+        'pending': 'warning',
+        'confirmed': 'success',
+        'cancelled': 'danger',
+        'archived': 'secondary'
+    };
+    const badgeColor = badges[status] || 'secondary';
+    return `<span class="badge bg-${badgeColor}">${status.toUpperCase()}</span>`;
+}
+
+// Confirm appointment from modal
+function confirmAppointmentFromModal() {
+    if (!window.currentAppointmentId) return;
+    confirmAppointment(window.currentAppointmentId);
+}
+
+// Archive appointment from modal
+function archiveAppointmentFromModal() {
+    if (!window.currentAppointmentId) return;
+    archiveAppointment(window.currentAppointmentId);
+}
+
+// Confirm appointment function
+function confirmAppointment(appointmentId) {
+    fetch('../admin/confirm_appointment.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            appointment_id: appointmentId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (window.viewModal) {
+                window.viewModal.hide();
+            }
+            location.reload();
+        } else {
+            console.error('Server response:', data);
+            alert(data.message || 'Error confirming appointment');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error confirming appointment. Please try again.');
+    });
+}
+
+// Archive appointment function
+function archiveAppointment(appointmentId) {
+    fetch('../admin/archive_appointment.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            appointment_id: appointmentId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (window.viewModal) {
+                window.viewModal.hide();
+            }
+            location.reload();
+        } else {
+            console.error('Server response:', data);
+            alert(data.message || 'Error archiving appointment');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error archiving appointment. Please try again.');
+    });
+}
+
+// Function to handle archived appointments page
+function handleAdminArchivedAppointmentsPage() {
+    // Initialize the view archived appointment modal
+    window.archivedModal = new bootstrap.Modal(document.getElementById('viewArchivedAppointmentModal'));
+}
+
+// Function to view archived appointment details
+function viewArchivedAppointment(appointmentData) {
+    // Store the appointment ID in the window object
+    window.currentArchivedAppointmentId = appointmentData.arc_appointment_id;
+
+    // Update modal content
+    document.getElementById('modalClientName').textContent = appointmentData.client_name;
+    document.getElementById('modalClientEmail').textContent = appointmentData.client_email;
+    document.getElementById('modalClientPhone').textContent = appointmentData.client_phone;
+    document.getElementById('modalService').textContent = appointmentData.service;
+    document.getElementById('modalDate').textContent = new Date(appointmentData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    document.getElementById('modalTime').textContent = new Date('1970-01-01T' + appointmentData.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    
+    // Set status with badge
+    document.getElementById('modalStatus').innerHTML = getStatusBadge(appointmentData.status);
+    
+    document.getElementById('modalCreated').textContent = new Date(appointmentData.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    document.getElementById('modalArchived').textContent = new Date(appointmentData.archived_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    // Show modal
+    window.archivedModal.show();
+}
+
+// Handle admin projects page
+function handleAdminProjectsPage() {
+    // Initialize project modal
+    window.viewProjectModal = new bootstrap.Modal(document.getElementById('viewProjectModal'));
+    window.currentProjectId = null;
+}
+
+// View project details
+function viewProject(projectData) {
+    window.currentProjectId = projectData.project_id;
+
+    // Update modal content with null checks
+    const elements = {
+        'modalClientName': projectData.client_name,
+        'modalService': projectData.service,
+        'modalDate': new Date(projectData.date).toLocaleDateString(),
+        'modalStatus': projectData.status.replace('_', ' ').toUpperCase(),
+        'modalNotes': projectData.notes || ''
+    };
+
+    // Update each element if it exists
+    Object.keys(elements).forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            if (id === 'modalNotes') {
+                element.value = elements[id];
+            } else {
+                element.textContent = elements[id];
+            }
+        }
+    });
+
+    // Handle quotation file display
+    const currentQuotationFile = document.getElementById('currentQuotationFile');
+    const uploadQuotationFile = document.getElementById('uploadQuotationFile');
+    const quotationFileLink = document.getElementById('quotationFileLink');
+
+    if (currentQuotationFile && uploadQuotationFile && quotationFileLink) {
+        if (projectData.quotation_file) {
+            currentQuotationFile.style.display = 'block';
+            uploadQuotationFile.style.display = 'none';
+            quotationFileLink.href = '../uploads/quotations/' + projectData.quotation_file;
+            quotationFileLink.textContent = projectData.quotation_file;
+        } else {
+            currentQuotationFile.style.display = 'none';
+            uploadQuotationFile.style.display = 'block';
+            const fileInput = document.getElementById('quotationFileInput');
+            if (fileInput) {
+                fileInput.value = '';
+            }
+        }
+    }
+
+    // Show modal
+    if (window.viewProjectModal) {
+        window.viewProjectModal.show();
+    } else {
+        const modal = new bootstrap.Modal(document.getElementById('viewProjectModal'));
+        window.viewProjectModal = modal;
+        modal.show();
+    }
+}
+
+// Update project
+function updateProject() {
+    const projectId = window.currentProjectId;
+    if (!projectId) return;
+
+    const formData = new FormData();
+    formData.append('project_id', projectId);
+    formData.append('status', document.getElementById('modalStatus').textContent.toLowerCase().replace(' ', '_'));
+    formData.append('notes', document.getElementById('modalNotes').value);
+
+    // Add file if one is selected
+    const fileInput = document.getElementById('quotationFileInput');
+    if (fileInput.files.length > 0) {
+        formData.append('quotation_file', fileInput.files[0]);
+    }
+
+    fetch('../admin/update_project.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal and reload page
+            window.viewProjectModal.hide();
+            location.reload();
+        } else {
+            alert('Failed to update project: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to update project');
+    });
+}
+
+// Remove quotation file
+function removeQuotationFile() {
+    if (!confirm('Are you sure you want to remove this file?')) return;
+
+    const projectId = window.currentProjectId;
+    if (!projectId) return;
+
+    fetch('../admin/remove_quotation_file.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            project_id: projectId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update the file display
+            document.getElementById('currentQuotationFile').style.display = 'none';
+            document.getElementById('uploadQuotationFile').style.display = 'block';
+            document.getElementById('quotationFileInput').value = '';
+        } else {
+            alert('Failed to remove file: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to remove file');
+    });
+}
+
+// Add appointment to projects
+function addToProjects(appointmentData) {
+    fetch('../admin/add_to_projects.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(appointmentData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal and reload page
+            document.querySelector('#selectAppointmentModal .btn-close').click();
+            location.reload();
+        } else {
+            alert('Failed to add to projects: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to add to projects');
+    });
+}
+
+// Handle admin users page
+function handleAdminUsersPage() {
+    // Initialize modals
+    window.editUserModal = new bootstrap.Modal(document.getElementById('editUserModal'));
+    window.addUserModal = new bootstrap.Modal(document.getElementById('addUserModal'));
+}
+
+// View user details
+function viewUser(userData) {
+    // Placeholder for view functionality
+    console.log('View user:', userData);
+}
+
+// Edit user
+function editUser(userData) {
+    document.getElementById('editUserId').value = userData.user_id;
+    document.getElementById('editUserName').value = userData.name;
+    document.getElementById('editUserEmail').value = userData.email;
+    document.getElementById('editUserPhone').value = userData.phone;
+    window.editUserModal.show();
+}
+
+// Handle admin employees page
+function handleAdminEmployeesPage() {
+    // Initialize modals
+    window.editEmployeeModal = new bootstrap.Modal(document.getElementById('editEmployeeModal'));
+    window.addEmployeeModal = new bootstrap.Modal(document.getElementById('addEmployeeModal'));
+}
+
+// Edit employee
+function editEmployee(employeeData) {
+    document.getElementById('editEmployeeId').value = employeeData.user_id;
+    document.getElementById('editEmployeeName').value = employeeData.name;
+    document.getElementById('editEmployeeEmail').value = employeeData.email;
+    document.getElementById('editEmployeePhone').value = employeeData.phone;
+    document.getElementById('editEmployeeRole').value = employeeData.role;
+    window.editEmployeeModal.show();
+}
+
+// Update employee
+function updateEmployee() {
+    const userId = document.getElementById('editEmployeeId').value;
+    const name = document.getElementById('editEmployeeName').value;
+    const email = document.getElementById('editEmployeeEmail').value;
+    const phone = document.getElementById('editEmployeePhone').value;
+    const role = document.getElementById('editEmployeeRole').value;
+
+    if (!name || !email || !phone || !role) {
+        alert('Please fill in all fields');
+        return;
+    }
+
+    fetch('../admin/update_employee.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            name: name,
+            email: email,
+            phone: phone,
+            role: role
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.editEmployeeModal.hide();
+            location.reload();
+        } else {
+            alert(data.message || 'Error updating employee');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating employee');
+    });
+}
+
+// Add new employee
+function addEmployee() {
+    const name = document.getElementById('addEmployeeName').value;
+    const email = document.getElementById('addEmployeeEmail').value;
+    const phone = document.getElementById('addEmployeePhone').value;
+    const role = document.getElementById('addEmployeeRole').value;
+    const password = document.getElementById('addEmployeePassword').value;
+
+    if (!name || !email || !phone || !role || !password) {
+        alert('Please fill in all fields');
+        return;
+    }
+
+    fetch('../admin/add_employee.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            name: name,
+            email: email,
+            phone: phone,
+            role: role,
+            password: password
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.addEmployeeModal.hide();
+            location.reload();
+        } else {
+            alert(data.message || 'Error adding employee');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error adding employee');
+    });
+}
+
+// Deactivate employee
+function deactivateEmployee(userId) {
+    if (!confirm('Are you sure you want to deactivate this employee?')) return;
+
+    fetch('../admin/toggle_employee_status.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            status: 'inactive'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.message || 'Error deactivating employee');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error deactivating employee');
+    });
+}
+
+// Activate employee
+function activateEmployee(userId) {
+    if (!confirm('Are you sure you want to activate this employee?')) return;
+
+    fetch('../admin/toggle_employee_status.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            status: 'active'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.message || 'Error activating employee');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error activating employee');
+    });
+}

@@ -7,7 +7,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <nav class="navbar navbar-expand-lg navbar-dark">
     <div class="container">
         <a class="navbar-brand" href="/index.php">
-            <img src="/images/EBTC_logo.png" alt="EBTC Logo" height="120">
+            <img src="/images/EBTC_logo.png" alt="EBTC Logo" style="width: 150px; height: auto;">
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>

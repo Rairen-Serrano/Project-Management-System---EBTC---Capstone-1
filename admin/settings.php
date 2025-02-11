@@ -2,9 +2,9 @@
 session_start();
 require_once '../dbconnect.php';
 
-// Check if user is logged in and is a client
-if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'client') {
-    header('Location: ../index.php');
+// Check if user is logged in and is an admin
+if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
+    header('Location: ../admin_login.php');
     exit;
 }
 
@@ -45,7 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
 // Handle PIN change
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_pin'])) {
     try {
-        if ($_POST['current_pin'] !== $user['pin_code']) {
+        // First verify the current PIN using password_verify
+        if (!password_verify($_POST['current_pin'], $user['pin_code'])) {
             throw new Exception('Current PIN is incorrect');
         }
 
@@ -91,19 +92,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_pin'])) {
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
 </head>
-<body id="settingsPage">
-    <?php include 'client_header.php'; ?>
-    
-    <div class="client-dashboard-wrapper">
+<body id="adminSettingsPage">
+    <div class="admin-dashboard-wrapper">
+        <!-- Include admin header -->
+        <?php include 'admin_header.php'; ?>
+        
         <!-- Main Content -->
-        <div class="client-main-content">
-            <!-- Mobile Toggle Button -->
-            <button class="btn btn-primary d-md-none mb-3" id="clientSidebarToggle">
-                <i class="fas fa-bars"></i>
-            </button>
-
+        <div class="admin-main-content">
             <!-- Success/Error Messages -->
             <?php if (isset($_SESSION['success_message'])): ?>
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -179,38 +175,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_pin'])) {
                     <h5 class="modal-title">Change Password</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <form id="changePasswordForm">
+                <form action="" method="POST">
+                    <div class="modal-body">
                         <div class="mb-3">
-                            <label for="currentPassword" class="form-label">Current Password</label>
-                            <input type="password" class="form-control" id="currentPassword" required>
+                            <label class="form-label">Current Password</label>
+                            <input type="password" class="form-control" name="current_password" required>
                         </div>
                         <div class="mb-3">
-                            <label for="newPassword" class="form-label">New Password</label>
-                            <input type="password" class="form-control" id="newPassword" required>
+                            <label class="form-label">New Password</label>
+                            <input type="password" class="form-control" name="new_password" required>
                         </div>
                         <div class="mb-3">
-                            <label for="confirmNewPassword" class="form-label">Confirm New Password</label>
-                            <input type="password" class="form-control" id="confirmNewPassword" required>
+                            <label class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-control" name="confirm_password" required>
                         </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="sendVerificationBtn">Continue</button>
-                </div>
+                        <input type="hidden" name="change_password" value="1">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Change Password</button>
+                    </div>
+                </form>
             </div>
-        </div>
-    </div>
-
-    <!-- Success/Error Message Toast -->
-    <div class="toast-container position-fixed bottom-0 end-0 p-3">
-        <div class="toast" role="alert" id="messageToast">
-            <div class="toast-header">
-                <strong class="me-auto" id="toastTitle">Notification</strong>
-                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-            </div>
-            <div class="toast-body" id="toastMessage"></div>
         </div>
     </div>
 
@@ -265,5 +251,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_pin'])) {
         </div>
     </div>
 
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle PIN input navigation and collection
+        const pinForms = ['current', 'new', 'confirm'];
+        
+        pinForms.forEach(formType => {
+            const inputs = document.querySelectorAll(`.${formType}-pin`);
+            const hiddenInput = document.getElementById(`${formType}_pin`);
+            
+            inputs.forEach((input, index) => {
+                // Handle input
+                input.addEventListener('input', function() {
+                    if (this.value && index < inputs.length - 1) {
+                        inputs[index + 1].focus();
+                    }
+                    // Update hidden input
+                    hiddenInput.value = Array.from(inputs).map(input => input.value).join('');
+                });
+
+                // Handle backspace
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Backspace' && !this.value && index > 0) {
+                        inputs[index - 1].focus();
+                    }
+                });
+            });
+        });
+
+        // Handle form submission
+        document.getElementById('changePinForm').addEventListener('submit', function(e) {
+            pinForms.forEach(formType => {
+                const inputs = document.querySelectorAll(`.${formType}-pin`);
+                const hiddenInput = document.getElementById(`${formType}_pin`);
+                hiddenInput.value = Array.from(inputs).map(input => input.value).join('');
+            });
+        });
+    });
+    </script>
 </body>
 </html> 

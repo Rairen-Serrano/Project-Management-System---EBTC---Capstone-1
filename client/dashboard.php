@@ -13,7 +13,7 @@ $stmt = $pdo->prepare("
     SELECT appointment_id, service, date, time, status, created_at
     FROM appointments 
     WHERE client_id = ?
-    ORDER BY date DESC, time DESC
+    ORDER BY created_at DESC
 ");
 $stmt->execute([$_SESSION['user_id']]);
 $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -155,7 +155,7 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                             <button class="btn btn-info btn-action" 
                                                                     onclick="viewDetails(<?php echo $appointment['appointment_id']; ?>)">
                                                                 <h1>View</h1>
-                                                            </button>
+                        </button>
                                                         <?php endif; ?>
                                                     </td>
                                                 </tr>
@@ -178,13 +178,13 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="modal-header">
                     <h5 class="modal-title">Appointment Details</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
+                    </div>
                 <div class="modal-body">
                     <!-- Details will be loaded here via JavaScript -->
                 </div>
             </div>
         </div>
-    </div>
+                    </div>
 
     <!-- PIN Verification Modal -->
     <div class="modal fade" id="pinVerificationModal" tabindex="-1" data-bs-backdrop="static">
@@ -210,7 +210,7 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
             </div>
         </div>
-    </div>
+                    </div>
 
     <!-- Reschedule Modal -->
     <div class="modal fade" id="rescheduleModal" tabindex="-1" data-bs-backdrop="static">
@@ -237,8 +237,8 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <button type="button" class="btn btn-primary" id="confirmReschedule">Confirm Reschedule</button>
                 </div>
             </div>
-        </div>
-    </div>
+                    </div>
+                            </div>
 
     <!-- PIN Verification Modal for Reschedule -->
     <div class="modal fade" id="pinVerificationRescheduleModal" tabindex="-1" data-bs-backdrop="static">
@@ -247,7 +247,7 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="modal-header">
                     <h5 class="modal-title">Enter PIN to Reschedule</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
+                            </div>
                 <div class="modal-body">
                     <p class="text-center mb-4">Please enter your 4-digit PIN code to confirm rescheduling.</p>
                     <div class="pin-input-group">

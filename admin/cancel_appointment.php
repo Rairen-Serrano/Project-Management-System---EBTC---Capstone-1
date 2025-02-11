@@ -16,7 +16,7 @@ if (!isset($_GET['id'])) {
 }
 
 try {
-    // Get appointment details first to verify it's cancelled
+    // Get appointment details first to verify it's pending
     $stmt = $pdo->prepare("SELECT status FROM appointments WHERE appointment_id = ?");
     $stmt->execute([$_GET['id']]);
     $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -25,19 +25,18 @@ try {
         throw new Exception('Appointment not found');
     }
 
-    if ($appointment['status'] !== 'cancelled') {
-        throw new Exception('Only cancelled appointments can be archived');
+    if ($appointment['status'] !== 'pending') {
+        throw new Exception('Only pending appointments can be cancelled');
     }
 
-    // Update the archived status to 'Yes'
-    $stmt = $pdo->prepare("UPDATE appointments SET archived = 'Yes' WHERE appointment_id = ?");
+    // Update the status to cancelled
+    $stmt = $pdo->prepare("UPDATE appointments SET status = 'cancelled' WHERE appointment_id = ?");
     $stmt->execute([$_GET['id']]);
 
-    $_SESSION['success_message'] = 'Appointment has been archived successfully';
+    $_SESSION['success_message'] = 'Appointment has been cancelled successfully';
 } catch (Exception $e) {
     $_SESSION['error_message'] = $e->getMessage();
 }
 
 // Redirect back to appointments page
-header('Location: appointments.php');
-?> 
+header('Location: appointments.php'); 

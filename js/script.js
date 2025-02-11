@@ -39,11 +39,22 @@ document.addEventListener('DOMContentLoaded', function() {
         case 'adminEmployeesPage':
             handleAdminEmployeesPage();
             break;
+        case 'managerDashboardPage':
+            handleManagerDashboardPage();
+            break;
+        case 'adminSettingsPage':
+            handleAdminSettingsPage();
+            break;
         // Add more cases as needed
     }
 
     // Add password visibility toggle for reset password page
     handlePasswordToggles();
+
+    // Initialize admin dashboard functionality if on admin dashboard page
+    if (document.getElementById('adminDashboardPage')) {
+        handleAdminDashboardPage();
+    }
 });
 
 // Move the password toggle functionality to a separate function
@@ -235,17 +246,17 @@ function handleRegisterPage() {
     const passwordFields = document.querySelectorAll('input[type="password"]');
     if (passwordFields) {
         passwordFields.forEach(passwordField => {
-            const toggleBtn = document.createElement('button');
-            toggleBtn.type = 'button';
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
             toggleBtn.className = 'btn btn-link ebtc-password-toggle';
-            toggleBtn.innerHTML = '<i class="fa-solid fa-eye" style="color: #000000;"></i>';
+        toggleBtn.innerHTML = '<i class="fa-solid fa-eye" style="color: #000000;"></i>';
             passwordField.parentElement.appendChild(toggleBtn);
-            toggleBtn.addEventListener('click', function() {
+        toggleBtn.addEventListener('click', function() {
                 const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
                 passwordField.setAttribute('type', type);
                 this.innerHTML = type === 'password' ? '<i class="fa-solid fa-eye" style="color: #000000;"></i>' : '<i class="fa-solid fa-eye-slash" style="color: #000000;"></i>';
-            });
         });
+    });
     }
 }
 
@@ -1668,4 +1679,301 @@ function activateEmployee(userId) {
         console.error('Error:', error);
         alert('Error activating employee');
     });
+}
+
+function handleAdminDashboardPage() {
+    const mainContent = document.querySelector('.admin-main-content');
+    const pinSetupModal = document.getElementById('pinSetupModal');
+    const pinVerificationModal = document.getElementById('pinVerificationModal');
+
+    // Only proceed with PIN setup if the modal exists and we need PIN setup
+    if (pinSetupModal && mainContent.style.display === 'none' && document.body.dataset.needsPinSetup === 'true') {
+        const setupModal = new bootstrap.Modal(pinSetupModal);
+        const setupPinInputs = document.querySelectorAll('.setup-pin');
+        const confirmPinInputs = document.querySelectorAll('.confirm-pin');
+        
+        setupModal.show();
+
+        // Handle PIN input navigation for setup
+        [setupPinInputs, confirmPinInputs].forEach(inputGroup => {
+            inputGroup.forEach((input, index) => {
+                input.addEventListener('input', function() {
+                    if (this.value && index < inputGroup.length - 1) {
+                        inputGroup[index + 1].focus();
+                    }
+                });
+
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Backspace' && !this.value && index > 0) {
+                        inputGroup[index - 1].focus();
+                    }
+                });
+            });
+        });
+
+        // Handle PIN setup submission
+        document.getElementById('savePinBtn').addEventListener('click', function() {
+            const setupPin = Array.from(setupPinInputs).map(input => input.value).join('');
+            const confirmPin = Array.from(confirmPinInputs).map(input => input.value).join('');
+
+            if (setupPin !== confirmPin) {
+                document.getElementById('pinSetupError').textContent = 'PINs do not match';
+                document.getElementById('pinSetupError').style.display = 'block';
+                return;
+            }
+
+            if (setupPin.length !== 4) {
+                document.getElementById('pinSetupError').textContent = 'PIN must be 4 digits';
+                document.getElementById('pinSetupError').style.display = 'block';
+                return;
+            }
+
+            // Make an AJAX call to save the PIN
+            fetch('setup_pin.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'pin=' + setupPin
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    mainContent.style.display = 'block';
+                    setupModal.hide();
+                } else {
+                    document.getElementById('pinSetupError').textContent = data.message || 'Error setting PIN';
+                    document.getElementById('pinSetupError').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('pinSetupError').textContent = 'Error setting PIN';
+                document.getElementById('pinSetupError').style.display = 'block';
+            });
+        });
+    }
+
+    // Show PIN verification modal if needed (only if we don't need PIN setup)
+    if (pinVerificationModal && mainContent.style.display === 'none' && document.body.dataset.needsPinSetup !== 'true') {
+        const verifyModal = new bootstrap.Modal(pinVerificationModal);
+        verifyModal.show();
+
+        // Handle PIN input navigation
+        const pinInputs = document.querySelectorAll('.pin-input:not(.setup-pin):not(.confirm-pin)');
+        pinInputs.forEach((input, index) => {
+            input.addEventListener('input', function() {
+                if (this.value && index < pinInputs.length - 1) {
+                    pinInputs[index + 1].focus();
+                }
+            });
+
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace' && !this.value && index > 0) {
+                    pinInputs[index - 1].focus();
+                }
+            });
+        });
+
+        // Handle PIN verification
+        document.getElementById('verifyPinBtn').addEventListener('click', function() {
+            let pin = Array.from(pinInputs).map(input => input.value).join('');
+            
+            // Make an AJAX call to verify the PIN
+            fetch('verify_pin.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'pin=' + pin
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    mainContent.style.display = 'block';
+                    verifyModal.hide();
+                } else {
+                    document.getElementById('pinError').style.display = 'block';
+                    pinInputs.forEach(input => input.value = '');
+                    pinInputs[0].focus();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        });
+    }
+}
+
+function handleManagerDashboardPage() {
+    const mainContent = document.querySelector('.manager-main-content');
+    const pinSetupModal = document.getElementById('pinSetupModal');
+    const pinVerificationModal = document.getElementById('pinVerificationModal');
+
+    // Only proceed with PIN setup if the modal exists and we need PIN setup
+    if (pinSetupModal && mainContent.style.display === 'none' && document.body.dataset.needsPinSetup === 'true') {
+        const setupModal = new bootstrap.Modal(pinSetupModal);
+        const setupPinInputs = document.querySelectorAll('.setup-pin');
+        const confirmPinInputs = document.querySelectorAll('.confirm-pin');
+        
+        setupModal.show();
+
+        // Handle PIN input navigation for setup
+        [setupPinInputs, confirmPinInputs].forEach(inputGroup => {
+            inputGroup.forEach((input, index) => {
+                input.addEventListener('input', function() {
+                    if (this.value && index < inputGroup.length - 1) {
+                        inputGroup[index + 1].focus();
+                    }
+                });
+
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Backspace' && !this.value && index > 0) {
+                        inputGroup[index - 1].focus();
+                    }
+                });
+            });
+        });
+
+        // Handle PIN setup submission
+        document.getElementById('savePinBtn').addEventListener('click', function() {
+            const setupPin = Array.from(setupPinInputs).map(input => input.value).join('');
+            const confirmPin = Array.from(confirmPinInputs).map(input => input.value).join('');
+
+            if (setupPin !== confirmPin) {
+                document.getElementById('pinSetupError').textContent = 'PINs do not match';
+                document.getElementById('pinSetupError').style.display = 'block';
+                return;
+            }
+
+            if (setupPin.length !== 4) {
+                document.getElementById('pinSetupError').textContent = 'PIN must be 4 digits';
+                document.getElementById('pinSetupError').style.display = 'block';
+                return;
+            }
+
+            // Make an AJAX call to save the PIN
+            fetch('setup_pin.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'pin=' + setupPin
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    mainContent.style.display = 'block';
+                    setupModal.hide();
+                } else {
+                    document.getElementById('pinSetupError').textContent = data.message || 'Error setting PIN';
+                    document.getElementById('pinSetupError').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('pinSetupError').textContent = 'Error setting PIN';
+                document.getElementById('pinSetupError').style.display = 'block';
+            });
+        });
+    }
+
+    // Show PIN verification modal if needed (only if we don't need PIN setup)
+    if (pinVerificationModal && mainContent.style.display === 'none' && document.body.dataset.needsPinSetup !== 'true') {
+        const verifyModal = new bootstrap.Modal(pinVerificationModal);
+        verifyModal.show();
+
+        // Handle PIN input navigation
+        const pinInputs = document.querySelectorAll('.pin-input:not(.setup-pin):not(.confirm-pin)');
+        pinInputs.forEach((input, index) => {
+            input.addEventListener('input', function() {
+                if (this.value && index < pinInputs.length - 1) {
+                    pinInputs[index + 1].focus();
+                }
+            });
+
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace' && !this.value && index > 0) {
+                    pinInputs[index - 1].focus();
+                }
+            });
+        });
+
+        // Handle PIN verification
+        document.getElementById('verifyPinBtn').addEventListener('click', function() {
+            let pin = Array.from(pinInputs).map(input => input.value).join('');
+            
+            // Make an AJAX call to verify the PIN
+            fetch('verify_pin.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'pin=' + pin
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    mainContent.style.display = 'block';
+                    verifyModal.hide();
+                } else {
+                    document.getElementById('pinError').style.display = 'block';
+                    pinInputs.forEach(input => input.value = '');
+                    pinInputs[0].focus();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        });
+    }
+}
+
+function handleAdminSettingsPage() {
+    const changePinForm = document.getElementById('changePinForm');
+    if (changePinForm) {
+        // Handle PIN input navigation for all PIN input groups
+        const pinInputGroups = [
+            document.querySelectorAll('.current-pin'),
+            document.querySelectorAll('.new-pin'),
+            document.querySelectorAll('.confirm-pin')
+        ];
+
+        pinInputGroups.forEach(inputGroup => {
+            inputGroup.forEach((input, index) => {
+                input.addEventListener('input', function() {
+                    if (this.value && index < inputGroup.length - 1) {
+                        inputGroup[index + 1].focus();
+                    }
+                });
+
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Backspace' && !this.value && index > 0) {
+                        inputGroup[index - 1].focus();
+                    }
+                });
+            });
+        });
+
+        // Handle form submission
+        changePinForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // Combine PIN inputs into hidden fields
+            document.getElementById('current_pin').value = Array.from(document.querySelectorAll('.current-pin'))
+                .map(input => input.value)
+                .join('');
+
+            document.getElementById('new_pin').value = Array.from(document.querySelectorAll('.new-pin'))
+                .map(input => input.value)
+                .join('');
+
+            document.getElementById('confirm_pin').value = Array.from(document.querySelectorAll('.confirm-pin'))
+                .map(input => input.value)
+                .join('');
+
+            // Submit the form
+            this.submit();
+        });
+    }
 }

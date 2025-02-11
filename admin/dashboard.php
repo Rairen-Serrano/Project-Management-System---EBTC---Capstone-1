@@ -8,6 +8,17 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
     exit;
 }
 
+// Check if user has a PIN code set
+$stmt = $pdo->prepare("SELECT pin_code FROM users WHERE user_id = ?");
+$stmt->execute([$_SESSION['user_id']]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (empty($user['pin_code'])) {
+    $_SESSION['needs_pin_setup'] = true;
+} else if (!isset($_SESSION['pin_verified'])) {
+    $_SESSION['needs_pin_verification'] = true;
+}
+
 // Get total users (clients)
 $stmt = $pdo->prepare("SELECT COUNT(*) as total_users FROM users WHERE role = 'client'");
 $stmt->execute();
@@ -33,9 +44,8 @@ $stmt = $pdo->prepare("
     SELECT a.*, u.name as client_name 
     FROM appointments a 
     JOIN users u ON a.client_id = u.user_id 
-    WHERE a.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
     ORDER BY a.created_at DESC
-    LIMIT 10
+    LIMIT 5
 ");
 $stmt->execute();
 $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -50,10 +60,6 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <!-- CSS -->
     <link rel="stylesheet" href="../css/style.css">
-
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../js/script.js"></script>
     
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -61,14 +67,17 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../js/script.js"></script>
 </head>
-<body id="adminDashboardPage">
+<body id="adminDashboardPage" data-needs-pin-setup="<?php echo empty($user['pin_code']) ? 'true' : 'false'; ?>">
     <div class="admin-dashboard-wrapper">
         <!-- Include admin header -->
         <?php include 'admin_header.php'; ?>
         
         <!-- Main Content -->
-        <div class="admin-main-content">
+        <div class="admin-main-content" <?php echo !isset($_SESSION['pin_verified']) ? 'style="display: none;"' : ''; ?>>
             <!-- Success/Error Messages -->
             <?php if (isset($_SESSION['success_message'])): ?>
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -224,18 +233,87 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="card-body">
                             <div class="d-grid gap-2">
-                                <button class="btn btn-primary">
-                                    <i class="fas fa-user-plus me-2"></i>Add New User
-                                </button>
-                                <button class="btn btn-success">
-                                    <i class="fas fa-calendar-plus me-2"></i>Create Appointment
-                                </button>
-                                <button class="btn btn-info">
+                                <a href="add_employee.php" class="btn btn-primary">
+                                    <i class="fas fa-user-plus me-2"></i>Add Employee
+                                </a>
+                                <a href="archived_appointments.php" class="btn btn-secondary">
+                                    <i class="fas fa-archive me-2"></i>View Archived Appointments
+                                </a>
+                                <a href="generate_report.php" class="btn btn-info">
                                     <i class="fas fa-file-alt me-2"></i>Generate Report
-                                </button>
+                                </a>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PIN Verification Modal -->
+    <div class="modal fade" id="pinVerificationModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Admin PIN Verification</h5>
+                </div>
+                <div class="modal-body">
+                    <p class="text-center mb-4">Please enter your 4-digit PIN code to access the dashboard.</p>
+                    <div class="pin-input-group">
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                    </div>
+                    <div id="pinError" class="text-danger text-center mt-2" style="display: none;">
+                        Invalid PIN. Please try again.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="verifyPinBtn">Verify PIN</button>
+                    <a href="../logout.php" class="btn btn-secondary">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PIN Setup Modal -->
+    <div class="modal fade" id="pinSetupModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Set Up Your PIN</h5>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        For security purposes, you need to set up a 4-digit PIN code. This PIN will be required each time you access the dashboard.
+                    </div>
+                    <form id="pinSetupForm">
+                        <div class="mb-4">
+                            <label class="form-label">Enter New PIN</label>
+                            <div class="pin-input-group">
+                                <input type="password" class="pin-input setup-pin" maxlength="1" pattern="[0-9]" required>
+                                <input type="password" class="pin-input setup-pin" maxlength="1" pattern="[0-9]" required>
+                                <input type="password" class="pin-input setup-pin" maxlength="1" pattern="[0-9]" required>
+                                <input type="password" class="pin-input setup-pin" maxlength="1" pattern="[0-9]" required>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label">Confirm PIN</label>
+                            <div class="pin-input-group">
+                                <input type="password" class="pin-input confirm-pin" maxlength="1" pattern="[0-9]" required>
+                                <input type="password" class="pin-input confirm-pin" maxlength="1" pattern="[0-9]" required>
+                                <input type="password" class="pin-input confirm-pin" maxlength="1" pattern="[0-9]" required>
+                                <input type="password" class="pin-input confirm-pin" maxlength="1" pattern="[0-9]" required>
+                            </div>
+                        </div>
+                        <div id="pinSetupError" class="text-danger text-center mt-2" style="display: none;"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="savePinBtn">Save PIN</button>
+                    <a href="../logout.php" class="btn btn-secondary">Logout</a>
                 </div>
             </div>
         </div>

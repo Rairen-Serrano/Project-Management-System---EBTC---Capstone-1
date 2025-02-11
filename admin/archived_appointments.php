@@ -9,37 +9,23 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
 }
 
 // Get filter parameters
-$status_filter = isset($_GET['status']) ? $_GET['status'] : 'all';
 $date_filter = isset($_GET['date']) ? $_GET['date'] : 'all';
 $search = isset($_GET['search']) ? $_GET['search'] : '';
 
 // Build the base query
 $query = "
     SELECT 
-        a.arc_appointment_id,
-        a.appointment_id,
-        a.client_id,
-        a.service,
-        a.date,
-        a.time,
-        a.status,
-        a.created_at,
-        a.archived_at,
+        a.*, 
         u.name as client_name,
         u.email as client_email,
         u.phone as client_phone
-    FROM archived_appointments a
+    FROM appointments a
     JOIN users u ON a.client_id = u.user_id
-    WHERE 1=1
+    WHERE a.archived = 'Yes'
+    AND a.status = 'cancelled'
 ";
 
 $params = [];
-
-// Add status filter
-if ($status_filter !== 'all') {
-    $query .= " AND a.status = ?";
-    $params[] = $status_filter;
-}
 
 // Add date filter
 switch($date_filter) {
@@ -51,9 +37,6 @@ switch($date_filter) {
         break;
     case 'this_month':
         $query .= " AND MONTH(a.date) = MONTH(CURDATE()) AND YEAR(a.date) = YEAR(CURDATE())";
-        break;
-    case 'this_year':
-        $query .= " AND YEAR(a.date) = YEAR(CURDATE())";
         break;
 }
 
@@ -67,12 +50,12 @@ if (!empty($search)) {
 }
 
 // Add sorting
-$query .= " ORDER BY a.archived_at DESC";
+$query .= " ORDER BY a.date DESC, a.time DESC";
 
 // Prepare and execute the query
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
-$archived_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -94,7 +77,6 @@ $archived_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../js/script.js"></script>
-    
 </head>
 <body id="adminArchivedAppointmentsPage">
     <div class="admin-dashboard-wrapper">
@@ -105,7 +87,7 @@ $archived_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h3>Archived Appointments</h3>
                 <a href="appointments.php" class="btn btn-primary">
-                    <i class="fas fa-arrow-left me-2"></i>Back to Appointments
+                    <i class="fas fa-calendar me-2"></i>View Active Appointments
                 </a>
             </div>
 
@@ -113,32 +95,19 @@ $archived_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="card mb-4">
                 <div class="card-body">
                     <form method="GET" class="row g-3">
-                        <!-- Status Filter -->
-                        <div class="col-md-3">
-                            <label class="form-label">Status</label>
-                            <select name="status" class="form-select" onchange="this.form.submit()">
-                                <option value="all" <?php echo $status_filter === 'all' ? 'selected' : ''; ?>>All Status</option>
-                                <option value="pending" <?php echo $status_filter === 'pending' ? 'selected' : ''; ?>>Pending</option>
-                                <option value="confirmed" <?php echo $status_filter === 'confirmed' ? 'selected' : ''; ?>>Confirmed</option>
-                                <option value="cancelled" <?php echo $status_filter === 'cancelled' ? 'selected' : ''; ?>>Cancelled</option>
-                                <option value="completed" <?php echo $status_filter === 'completed' ? 'selected' : ''; ?>>Completed</option>
-                            </select>
-                        </div>
-
                         <!-- Date Filter -->
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label class="form-label">Date</label>
                             <select name="date" class="form-select" onchange="this.form.submit()">
                                 <option value="all" <?php echo $date_filter === 'all' ? 'selected' : ''; ?>>All Dates</option>
                                 <option value="today" <?php echo $date_filter === 'today' ? 'selected' : ''; ?>>Today</option>
                                 <option value="this_week" <?php echo $date_filter === 'this_week' ? 'selected' : ''; ?>>This Week</option>
                                 <option value="this_month" <?php echo $date_filter === 'this_month' ? 'selected' : ''; ?>>This Month</option>
-                                <option value="this_year" <?php echo $date_filter === 'this_year' ? 'selected' : ''; ?>>This Year</option>
                             </select>
                         </div>
 
                         <!-- Search -->
-                        <div class="col-md-6">
+                        <div class="col-md-8">
                             <label class="form-label">Search</label>
                             <div class="input-group">
                                 <input type="text" name="search" class="form-control" placeholder="Search by client name, email, or service" value="<?php echo htmlspecialchars($search); ?>">
@@ -158,59 +127,28 @@ $archived_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
-                                    <th style="width: 25%">Client</th>
-                                    <th style="width: 15%">Service</th>
-                                    <th style="width: 20%">Date & Time</th>
-                                    <th style="width: 15%">Status</th>
-                                    <th style="width: 15%">Archived</th>
-                                    <th style="width: 10%">Actions</th>
+                                    <th>Client</th>
+                                    <th>Service</th>
+                                    <th>Date & Time</th>
+                                    <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php if (empty($archived_appointments)): ?>
+                                <?php if (empty($appointments)): ?>
                                 <tr>
-                                    <td colspan="6" class="text-center py-4">No archived appointments found</td>
+                                    <td colspan="4" class="text-center py-4">No archived appointments found</td>
                                 </tr>
                                 <?php else: ?>
-                                    <?php foreach ($archived_appointments as $appointment): ?>
+                                    <?php foreach ($appointments as $appointment): ?>
                                     <tr>
                                         <td><?php echo htmlspecialchars($appointment['client_name']); ?></td>
-                                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;">
-                                            <?php echo htmlspecialchars($appointment['service']); ?>
-                                        </td>
+                                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;"><?php echo htmlspecialchars($appointment['service']); ?></td>
                                         <td>
                                             <div class="fs-6"><?php echo date('M d, Y', strtotime($appointment['date'])); ?></div>
                                             <div class="text-muted"><?php echo date('h:i A', strtotime($appointment['time'])); ?></div>
                                         </td>
                                         <td>
-                                            <?php
-                                            $statusClass = '';
-                                            switch($appointment['status']) {
-                                                case 'pending':
-                                                    $statusClass = 'warning';
-                                                    break;
-                                                case 'confirmed':
-                                                    $statusClass = 'success';
-                                                    break;
-                                                case 'cancelled':
-                                                    $statusClass = 'danger';
-                                                    break;
-                                                case 'completed':
-                                                    $statusClass = 'info';
-                                                    break;
-                                            }
-                                            ?>
-                                            <span class="badge bg-<?php echo $statusClass; ?>">
-                                                <?php echo ucfirst($appointment['status']); ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <?php echo date('M d, Y', strtotime($appointment['archived_at'])); ?>
-                                        </td>
-                                        <td>
-                                            <button type="button" class="btn btn-sm btn-info" onclick='viewArchivedAppointment(<?php echo htmlspecialchars(json_encode($appointment)); ?>)'>
-                                                View
-                                            </button>
+                                            <span class="status-badge">Cancelled</span>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -246,7 +184,6 @@ $archived_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <p><strong>Time:</strong> <span id="modalTime"></span></p>
                             <p><strong>Status:</strong> <span id="modalStatus"></span></p>
                             <p><strong>Created:</strong> <span id="modalCreated"></span></p>
-                            <p><strong>Archived:</strong> <span id="modalArchived"></span></p>
                         </div>
                     </div>
                 </div>
@@ -257,5 +194,36 @@ $archived_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
+    <style>
+    .status-badge {
+        font-size: 0.875rem;
+        padding: 0.4rem 0.8rem;
+        border-radius: 0.25rem;
+        display: inline-block;
+        background-color: #dc3545;
+        color: #fff;
+    }
+    </style>
+
+    <script>
+    function viewArchivedAppointment(appointment) {
+        // Fill in the modal with appointment details
+        document.getElementById('modalClientName').textContent = appointment.client_name;
+        document.getElementById('modalClientEmail').textContent = appointment.client_email;
+        document.getElementById('modalClientPhone').textContent = appointment.client_phone;
+        document.getElementById('modalService').textContent = appointment.service;
+        document.getElementById('modalDate').textContent = new Date(appointment.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        document.getElementById('modalTime').textContent = new Date('2000-01-01 ' + appointment.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        
+        // Update status with badge
+        document.getElementById('modalStatus').innerHTML = '<span class="status-badge">Cancelled</span>';
+        
+        document.getElementById('modalCreated').textContent = new Date(appointment.created_at).toLocaleString();
+
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('viewArchivedAppointmentModal'));
+        modal.show();
+    }
+    </script>
 </body>
 </html> 

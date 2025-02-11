@@ -4,13 +4,12 @@ require_once '../dbconnect.php';
 
 header('Content-Type: application/json');
 
-// Check if user is logged in and is a client
-if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'client') {
+// Check if user is logged in and is a manager
+if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'project_manager') {
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
     exit;
 }
 
-// Check if PIN is provided
 if (!isset($_POST['pin'])) {
     echo json_encode(['success' => false, 'message' => 'PIN is required']);
     exit;
@@ -29,10 +28,12 @@ try {
 
     // First try direct comparison for non-hashed PINs
     if ($_POST['pin'] === $user['pin_code']) {
+        $_SESSION['pin_verified'] = true;
         echo json_encode(['success' => true, 'message' => 'PIN verified successfully']);
     } 
     // If direct comparison fails, try password_verify for hashed PINs
     else if (password_verify($_POST['pin'], $user['pin_code'])) {
+        $_SESSION['pin_verified'] = true;
         echo json_encode(['success' => true, 'message' => 'PIN verified successfully']);
     }
     else {
@@ -42,5 +43,4 @@ try {
 } catch (Exception $e) {
     error_log("Error in verify_pin.php: " . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'Error verifying PIN']);
-}
-?> 
+} 

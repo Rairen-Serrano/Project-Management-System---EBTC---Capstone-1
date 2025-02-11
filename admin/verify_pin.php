@@ -6,37 +6,27 @@ header('Content-Type: application/json');
 
 // Check if user is logged in and is an admin
 if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
+    echo json_encode(['success' => false]);
     exit;
 }
 
-// Get POST data
-$data = json_decode(file_get_contents('php://input'), true);
-
-if (!isset($data['pin'])) {
-    echo json_encode(['success' => false, 'message' => 'PIN is required']);
+if (!isset($_POST['pin'])) {
+    echo json_encode(['success' => false]);
     exit;
 }
 
-try {
-    // Get the admin's PIN from the database
-    $stmt = $pdo->prepare("SELECT pin_code FROM users WHERE user_id = ? AND role = 'admin'");
-    $stmt->execute([$_SESSION['user_id']]);
-    $user = $stmt->fetch();
+$pin = $_POST['pin'];
 
-    if (!$user) {
-        echo json_encode(['success' => false, 'message' => 'User not found']);
-        exit;
-    }
+// Get the admin's PIN from the database
+$stmt = $pdo->prepare("SELECT pin_code FROM users WHERE user_id = ? AND role = 'admin'");
+$stmt->execute([$_SESSION['user_id']]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // Verify PIN
-    if ($data['pin'] === $user['pin_code']) {
-        echo json_encode(['success' => true]);
-    } else {
-        echo json_encode(['success' => false, 'message' => 'Incorrect PIN']);
-    }
-
-} catch (Exception $e) {
-    error_log("Error in verify_pin.php: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Error verifying PIN']);
+// Try both plain text and hashed verification
+if ($user && ($pin === $user['pin_code'] || password_verify($pin, $user['pin_code']))) {
+    $_SESSION['pin_verified'] = true;
+    unset($_SESSION['needs_pin_verification']);
+    echo json_encode(['success' => true]);
+} else {
+    echo json_encode(['success' => false]);
 } 

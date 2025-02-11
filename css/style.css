@@ -680,6 +680,10 @@ body {
     transition: margin-left 0.3s ease;
 }
 
+.manager-dashboard-wrapper{
+    margin-top: 50px;
+}
+
 @media (max-width: 768px) {
     .login-header, .client-header, .admin-header {
         left: 0;
@@ -763,4 +767,107 @@ body {
     min-width: 120px;
     padding: 0.5rem;
     vertical-align: middle;
+}
+
+/* Manager Dashboard Styles */
+.manager-dashboard-wrapper {
+    display: flex;
+    min-height: 100vh;
+    padding-top: 60px;
+}
+
+.manager-header {
+    background-color: #235347;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 1001;
+    height: 60px;
+}
+
+.manager-header .navbar-brand {
+    margin-left: 220px;
+}
+
+.manager-sidebar {
+    width: 220px;
+    background: #235347;
+    color: white;
+    position: fixed;
+    height: calc(100vh - 60px);
+    left: 0;
+    top: 60px;
+    z-index: 999;
+    transition: all 0.3s ease;
+    overflow-y: auto;
+    padding-top: 20px;
+}
+
+.manager-main-content {
+    flex: 1;
+    margin-left: 220px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    min-height: 100vh;
+}
+
+.manager-sidebar-menu a {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+}
+
+.manager-sidebar-menu a:hover,
+.manager-sidebar-menu a.active {
+    color: white;
+    background: rgba(255,255,255,0.1);
+}
+
+.manager-sidebar-menu a i {
+    width: 20px;
+    margin-right: 10px;
+    font-size: 0.9rem;
+}
+
+.manager-sidebar.collapsed {
+    width: 0;
+    padding: 0;
+}
+
+.manager-main-content.expanded {
+    margin-left: 0;
+}
+
+@media (max-width: 768px) {
+    .manager-header {
+        left: 0;
+    }
+    
+    .manager-header .navbar-brand {
+        margin-left: 0;
+    }
+    
+    .manager-sidebar {
+        width: 0;
+        padding: 0;
+    }
+    
+    .manager-sidebar.active {
+        width: 220px;
+        padding: 20px;
+    }
+    
+    .manager-main-content {
+        margin-left: 0;
+    }
+    
+    .manager-main-content.active {
+        margin-left: 220px;
+    }
 }

@@ -2,35 +2,42 @@
 session_start();
 require_once '../dbconnect.php';
 
-header('Content-Type: application/json');
-
 // Check if user is logged in and is an admin
 if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
+    header('Location: ../admin_login.php');
     exit;
 }
 
-// Get POST data
-$data = json_decode(file_get_contents('php://input'), true);
-
-if (!isset($data['appointment_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Appointment ID is required']);
+// Check if appointment ID is provided
+if (!isset($_GET['id'])) {
+    $_SESSION['error_message'] = 'Appointment ID is required';
+    header('Location: appointments.php');
     exit;
 }
 
 try {
-    // Update appointment status to confirmed
-    $stmt = $pdo->prepare("UPDATE appointments SET status = 'confirmed' WHERE appointment_id = ?");
-    $result = $stmt->execute([$data['appointment_id']]);
+    // Get appointment details first to verify it's pending
+    $stmt = $pdo->prepare("SELECT status FROM appointments WHERE appointment_id = ?");
+    $stmt->execute([$_GET['id']]);
+    $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($result) {
-        echo json_encode(['success' => true, 'message' => 'Appointment confirmed successfully']);
-    } else {
-        echo json_encode(['success' => false, 'message' => 'Failed to confirm appointment']);
+    if (!$appointment) {
+        throw new Exception('Appointment not found');
     }
 
+    if ($appointment['status'] !== 'pending') {
+        throw new Exception('Only pending appointments can be confirmed');
+    }
+
+    // Update the status to confirmed
+    $stmt = $pdo->prepare("UPDATE appointments SET status = 'confirmed' WHERE appointment_id = ?");
+    $stmt->execute([$_GET['id']]);
+
+    $_SESSION['success_message'] = 'Appointment has been confirmed successfully';
 } catch (Exception $e) {
-    error_log("Error in confirm_appointment.php: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Error confirming appointment: ' . $e->getMessage()]);
+    $_SESSION['error_message'] = $e->getMessage();
 }
+
+// Redirect back to appointments page
+header('Location: appointments.php');
 ?> 

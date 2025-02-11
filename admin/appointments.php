@@ -22,7 +22,8 @@ $query = "
         u.phone as client_phone
     FROM appointments a
     JOIN users u ON a.client_id = u.user_id
-    WHERE a.status NOT IN ('confirmed', 'archived')
+    WHERE a.archived = 'No'
+    AND a.status IN ('pending', 'cancelled')
 ";
 
 $params = [];
@@ -212,13 +213,8 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <div id="modalConfirmButton"></div>
-                    <div id="modalArchiveButton">
-                        <button type="button" class="btn btn-secondary" onclick="archiveAppointmentFromModal()">
-                            <i class="fas fa-archive me-2"></i>Archive
-                        </button>
-                    </div>
+                <div class="modal-footer" id="modalActions">
+                    <!-- Actions will be dynamically added here -->
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
@@ -232,7 +228,95 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         font-size: 24px;
         padding: 0;
     }
+
+    .status-badge {
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        display: inline-block;
+    }
+
+    .status-badge.pending {
+        background-color: #ffc107;
+        color: #000;
+    }
+
+    .status-badge.cancelled {
+        background-color: #dc3545;
+        color: #fff;
+    }
     </style>
+
+    <script>
+    function viewAppointment(appointment) {
+        // Fill in the modal with appointment details
+        document.getElementById('modalClientName').textContent = appointment.client_name;
+        document.getElementById('modalClientEmail').textContent = appointment.client_email;
+        document.getElementById('modalClientPhone').textContent = appointment.client_phone;
+        document.getElementById('modalService').textContent = appointment.service;
+        document.getElementById('modalDate').textContent = new Date(appointment.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        document.getElementById('modalTime').textContent = new Date('2000-01-01 ' + appointment.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        
+        // Update status with badge
+        const statusText = appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1);
+        const statusClass = appointment.status === 'pending' ? 'pending' : 'cancelled';
+        document.getElementById('modalStatus').innerHTML = `<span class="status-badge ${statusClass}">${statusText}</span>`;
+        
+        document.getElementById('modalCreated').textContent = new Date(appointment.created_at).toLocaleString();
+
+        // Clear existing action buttons except Close
+        const modalActions = document.getElementById('modalActions');
+        modalActions.innerHTML = '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>';
+
+        // Add appropriate action buttons based on status
+        if (appointment.status === 'pending') {
+            // For pending appointments: Confirm, Cancel
+            const confirmBtn = document.createElement('button');
+            confirmBtn.className = 'btn btn-success me-2';
+            confirmBtn.innerHTML = '<i class="fas fa-check me-2"></i>Confirm';
+            confirmBtn.onclick = () => confirmAppointment(appointment.appointment_id);
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'btn btn-danger me-2';
+            cancelBtn.innerHTML = '<i class="fas fa-times me-2"></i>Cancel';
+            cancelBtn.onclick = () => cancelAppointment(appointment.appointment_id);
+
+            modalActions.insertBefore(cancelBtn, modalActions.firstChild);
+            modalActions.insertBefore(confirmBtn, modalActions.firstChild);
+        } else if (appointment.status === 'cancelled') {
+            // For cancelled appointments: Archive
+            const archiveBtn = document.createElement('button');
+            archiveBtn.className = 'btn btn-secondary me-2';
+            archiveBtn.innerHTML = '<i class="fas fa-archive me-2"></i>Archive';
+            archiveBtn.onclick = () => archiveAppointment(appointment.appointment_id);
+
+            modalActions.insertBefore(archiveBtn, modalActions.firstChild);
+        }
+
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('viewAppointmentModal'));
+        modal.show();
+    }
+
+    function confirmAppointment(appointmentId) {
+        if (confirm('Are you sure you want to confirm this appointment?')) {
+            window.location.href = `confirm_appointment.php?id=${appointmentId}`;
+        }
+    }
+
+    function cancelAppointment(appointmentId) {
+        if (confirm('Are you sure you want to cancel this appointment?')) {
+            window.location.href = `cancel_appointment.php?id=${appointmentId}`;
+        }
+    }
+
+    function archiveAppointment(appointmentId) {
+        if (confirm('Are you sure you want to archive this appointment?')) {
+            window.location.href = `archive_appointment.php?id=${appointmentId}`;
+        }
+    }
+    </script>
 
 </body>
 </html> 

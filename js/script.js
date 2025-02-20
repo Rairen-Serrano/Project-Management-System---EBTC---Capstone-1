@@ -932,15 +932,6 @@ function handleSettingsPage() {
 
     // Initialize toast
     const toast = new bootstrap.Toast(document.getElementById('messageToast'));
-    
-    // Function to show toast message
-    function showToast(title, message, isError = false) {
-        document.getElementById('toastTitle').textContent = title;
-        document.getElementById('toastMessage').textContent = message;
-        document.getElementById('messageToast').classList.toggle('bg-danger', isError);
-        document.getElementById('messageToast').classList.toggle('text-white', isError);
-        toast.show();
-    }
 
     // Function to show toast message
     function showToast(title, message, isError = false) {
@@ -1593,47 +1584,6 @@ function updateEmployee() {
     });
 }
 
-// Add new employee
-function addEmployee() {
-    const name = document.getElementById('addEmployeeName').value;
-    const email = document.getElementById('addEmployeeEmail').value;
-    const phone = document.getElementById('addEmployeePhone').value;
-    const role = document.getElementById('addEmployeeRole').value;
-    const password = document.getElementById('addEmployeePassword').value;
-
-    if (!name || !email || !phone || !role || !password) {
-        alert('Please fill in all fields');
-        return;
-    }
-
-    fetch('../admin/add_employee.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            name: name,
-            email: email,
-            phone: phone,
-            role: role,
-            password: password
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.addEmployeeModal.hide();
-            location.reload();
-        } else {
-            alert(data.message || 'Error adding employee');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error adding employee');
-    });
-}
-
 // Deactivate employee
 function deactivateEmployee(userId) {
     if (!confirm('Are you sure you want to deactivate this employee?')) return;
@@ -1739,8 +1689,8 @@ function handleAdminDashboardPage() {
 
             // Make an AJAX call to save the PIN
             fetch('setup_pin.php', {
-                method: 'POST',
-                headers: {
+        method: 'POST',
+        headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
                 body: 'pin=' + setupPin
@@ -1795,56 +1745,21 @@ function handleAdminDashboardPage() {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
                 body: 'pin=' + pin
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
                     mainContent.style.display = 'block';
                     verifyModal.hide();
-                } else {
+        } else {
                     document.getElementById('pinError').style.display = 'block';
                     pinInputs.forEach(input => input.value = '');
                     pinInputs[0].focus();
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-        });
-    }
-
-    // Add Employee functionality
-    function addEmployee() {
-        const form = document.getElementById('addEmployeeForm');
-        const password = document.getElementById('addEmployeePassword').value;
-        const confirmPassword = document.getElementById('addEmployeeConfirmPassword').value;
-        
-        // Password match validation
-        if (password !== confirmPassword) {
-            alert('Passwords do not match');
-            return;
         }
-
-        // Create FormData object
-        const formData = new FormData(form);
-
-        // Send AJAX request
-        fetch('add_employee.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Employee added successfully!');
-                window.location.reload();
-            } else {
-                alert(data.message || 'Error adding employee');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error adding employee');
+    })
+    .catch(error => {
+        console.error('Error:', error);
+            });
         });
     }
 
@@ -1884,12 +1799,6 @@ function handleAdminDashboardPage() {
             }
         });
     }
-
-    // Make functions globally available
-    window.addEmployee = addEmployee;
-    window.togglePassword = togglePassword;
-
-    
 }
 
 function handleManagerProjectsPage() {
@@ -1988,5 +1897,82 @@ function updateProjectStatus(projectId, currentStatus) {
     .catch(error => {
         console.error('Error:', error);
         alert('An error occurred while updating the project status');
+    });
+}
+
+function archiveEmployee(userId) {
+    if (confirm('Are you sure you want to archive this employee?')) {
+        fetch('archive_employee.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `user_id=${userId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert(data.message || 'Error archiving employee');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error archiving employee');
+        });
+    }
+}
+
+function restoreEmployee(userId) {
+    if (confirm('Are you sure you want to restore this employee?')) {
+        fetch('restore_employee.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `user_id=${userId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert(data.message || 'Error restoring employee');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error restoring employee');
+        });
+    }
+}
+
+function deleteEmployee(userId) {
+    if (!confirm('Are you sure you want to permanently delete this employee? This action cannot be undone.')) {
+        return;
+    }
+
+    fetch('delete_employee.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `user_id=${userId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            window.location.reload();
+        } else {
+            alert(data.message || 'Error deleting employee');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error deleting employee');
     });
 }

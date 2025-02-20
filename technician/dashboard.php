@@ -2,8 +2,8 @@
 session_start();
 require_once '../dbconnect.php';
 
-// Check if user is logged in and is an admin
-if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
+// Check if user is logged in and is a technician
+if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'technician') {
     header('Location: ../admin_login.php');
     exit;
 }
@@ -18,37 +18,6 @@ if (empty($user['pin_code'])) {
 } else if (!isset($_SESSION['pin_verified'])) {
     $_SESSION['needs_pin_verification'] = true;
 }
-
-// Get total users (clients)
-$stmt = $pdo->prepare("SELECT COUNT(*) as total_users FROM users WHERE role = 'client'");
-$stmt->execute();
-$total_users = $stmt->fetch(PDO::FETCH_ASSOC)['total_users'];
-
-// Get total employees (non-clients)
-$stmt = $pdo->prepare("SELECT COUNT(*) as total_employees FROM users WHERE role != 'client'");
-$stmt->execute();
-$total_employees = $stmt->fetch(PDO::FETCH_ASSOC)['total_employees'];
-
-// Get total appointments
-$stmt = $pdo->prepare("SELECT COUNT(*) as total_appointments FROM appointments");
-$stmt->execute();
-$total_appointments = $stmt->fetch(PDO::FETCH_ASSOC)['total_appointments'];
-
-// Get pending appointments
-$stmt = $pdo->prepare("SELECT COUNT(*) as pending_requests FROM appointments WHERE status = 'pending'");
-$stmt->execute();
-$pending_requests = $stmt->fetch(PDO::FETCH_ASSOC)['pending_requests'];
-
-// Get recent appointments (last 7 days)
-$stmt = $pdo->prepare("
-    SELECT a.*, u.name as client_name 
-    FROM appointments a 
-    JOIN users u ON a.client_id = u.user_id 
-    ORDER BY a.created_at DESC
-    LIMIT 5
-");
-$stmt->execute();
-$recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -56,51 +25,28 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard | EBTC PMS</title>
-
+    <title>Technician Dashboard | EBTC PMS</title>
+    
     <!-- CSS -->
     <link rel="stylesheet" href="../css/style.css">
-    
+
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
+    
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../js/script.js"></script>
 </head>
-<body id="adminDashboardPage" data-needs-pin-setup="<?php echo empty($user['pin_code']) ? 'true' : 'false'; ?>">
-    <div class="admin-dashboard-wrapper">
-        <!-- Include admin header -->
-        <?php include 'admin_header.php'; ?>
-        
+<body id="technicianDashboardPage" data-needs-pin-setup="<?php echo empty($user['pin_code']) ? 'true' : 'false'; ?>">
+    <div class="technician-dashboard-wrapper">
+        <!-- Include technician header -->
+        <?php include 'technician_header.php'; ?>
+
         <!-- Main Content -->
-        <div class="admin-main-content" <?php echo !isset($_SESSION['pin_verified']) ? 'style="display: none;"' : ''; ?>>
-            <!-- Success/Error Messages -->
-            <?php if (isset($_SESSION['success_message'])): ?>
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="fas fa-check-circle me-2"></i>
-                    <?php 
-                    echo $_SESSION['success_message'];
-                    unset($_SESSION['success_message']);
-                    ?>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            <?php endif; ?>
-
-            <?php if (isset($_SESSION['error_message'])): ?>
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <i class="fas fa-exclamation-circle me-2"></i>
-                    <?php 
-                    echo $_SESSION['error_message'];
-                    unset($_SESSION['error_message']);
-                    ?>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            <?php endif; ?>
-
+        <div class="technician-main-content" <?php echo !isset($_SESSION['pin_verified']) ? 'style="display: none;"' : ''; ?>>
             <!-- Statistics Cards -->
             <div class="row g-4 mb-4">
                 <div class="col-md-3">
@@ -108,11 +54,11 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="card-title mb-1">Total Users</h6>
-                                    <h2 class="mb-0"><?php echo $total_users; ?></h2>
+                                    <h6 class="card-title mb-1">Assigned Tasks</h6>
+                                    <h2 class="mb-0">7</h2>
                                 </div>
                                 <div class="card-icon">
-                                    <i class="fas fa-users fa-2x"></i>
+                                    <i class="fas fa-tasks fa-2x"></i>
                                 </div>
                             </div>
                         </div>
@@ -123,11 +69,11 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="card-title mb-1">Total Appointments</h6>
-                                    <h2 class="mb-0"><?php echo $total_appointments; ?></h2>
+                                    <h6 class="card-title mb-1">Completed Tasks</h6>
+                                    <h2 class="mb-0">4</h2>
                                 </div>
                                 <div class="card-icon">
-                                    <i class="fas fa-calendar-check fa-2x"></i>
+                                    <i class="fas fa-check-circle fa-2x"></i>
                                 </div>
                             </div>
                         </div>
@@ -138,11 +84,11 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="card-title mb-1">Total Employees</h6>
-                                    <h2 class="mb-0"><?php echo $total_employees; ?></h2>
+                                    <h6 class="card-title mb-1">Pending Tasks</h6>
+                                    <h2 class="mb-0">3</h2>
                                 </div>
                                 <div class="card-icon">
-                                    <i class="fas fa-user-tie fa-2x"></i>
+                                    <i class="fas fa-clock fa-2x"></i>
                                 </div>
                             </div>
                         </div>
@@ -153,11 +99,11 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="card-title mb-1">Pending Requests</h6>
-                                    <h2 class="mb-0"><?php echo $pending_requests; ?></h2>
+                                    <h6 class="card-title mb-1">Active Projects</h6>
+                                    <h2 class="mb-0">3</h2>
                                 </div>
                                 <div class="card-icon">
-                                    <i class="fas fa-clock fa-2x"></i>
+                                    <i class="fas fa-project-diagram fa-2x"></i>
                                 </div>
                             </div>
                         </div>
@@ -170,54 +116,44 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="col-md-8">
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="card-title mb-0">Recent Appointments</h5>
+                            <h5 class="card-title mb-0">Current Tasks</h5>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle">
                                     <thead>
                                         <tr>
-                                            <th>Client</th>
-                                            <th>Service</th>
-                                            <th>Date</th>
+                                            <th>Task</th>
+                                            <th>Project</th>
+                                            <th>Due Date</th>
                                             <th>Status</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach ($recent_appointments as $appointment): ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars($appointment['client_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($appointment['service']); ?></td>
-                                                <td><?php echo date('M d, Y', strtotime($appointment['date'])) . ' ' . date('h:i A', strtotime($appointment['time'])); ?></td>
-                                                <td>
-                                                    <?php
-                                                        $statusClass = '';
-                                                        switch($appointment['status']) {
-                                                            case 'pending':
-                                                                $statusClass = 'bg-warning';
-                                                                break;
-                                                            case 'confirmed':
-                                                                $statusClass = 'bg-success';
-                                                                break;
-                                                            case 'cancelled':
-                                                                $statusClass = 'bg-danger';
-                                                                break;
-                                                            case 'archived':
-                                                                $statusClass = 'bg-dark';
-                                                                break;
-                                                            default:
-                                                                $statusClass = '';
-                                                        }
-                                                    ?>
-                                                    <span class="badge <?php echo $statusClass; ?>"><?php echo ucfirst($appointment['status']); ?></span>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                        <?php if (empty($recent_appointments)): ?>
-                                            <tr>
-                                                <td colspan="4" class="text-center">No recent appointments found</td>
-                                            </tr>
-                                        <?php endif; ?>
+                                        <tr>
+                                            <td>Network Configuration</td>
+                                            <td>Office Network Setup</td>
+                                            <td>Mar 25, 2024</td>
+                                            <td>
+                                                <span class="badge bg-warning">In Progress</span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>System Maintenance</td>
+                                            <td>Server Upgrade</td>
+                                            <td>Mar 28, 2024</td>
+                                            <td>
+                                                <span class="badge bg-info">Pending</span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Hardware Installation</td>
+                                            <td>Tech Lab Setup</td>
+                                            <td>Mar 30, 2024</td>
+                                            <td>
+                                                <span class="badge bg-success">Completed</span>
+                                            </td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -233,14 +169,14 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="card-body">
                             <div class="d-grid gap-2">
-                                <a href="add_employee_form.php" class="btn btn-primary">
-                                    <i class="fas fa-user-plus me-2"></i>Add Employee
+                                <a href="view_tasks.php" class="btn btn-primary">
+                                    <i class="fas fa-tasks me-2"></i>View All Tasks
                                 </a>
-                                <a href="archived_appointments.php" class="btn btn-secondary">
-                                    <i class="fas fa-archive me-2"></i>View Archived Appointments
+                                <a href="submit_report.php" class="btn btn-secondary">
+                                    <i class="fas fa-file-alt me-2"></i>Submit Report
                                 </a>
-                                <a href="generate_report.php" class="btn btn-info">
-                                    <i class="fas fa-file-alt me-2"></i>Generate Report
+                                <a href="equipment.php" class="btn btn-info">
+                                    <i class="fas fa-tools me-2"></i>Equipment Status
                                 </a>
                             </div>
                         </div>
@@ -250,12 +186,12 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-        <!-- PIN Verification Modal -->
+    <!-- PIN Verification Modal -->
     <div class="modal fade" id="pinVerificationModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Admin PIN Verification</h5>
+                    <h5 class="modal-title">Technician PIN Verification</h5>
                 </div>
                 <div class="modal-body">
                     <p class="text-center mb-4">Please enter your 4-digit PIN code to access the dashboard.</p>
@@ -319,4 +255,4 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 </body>
-</html> 
+</html>

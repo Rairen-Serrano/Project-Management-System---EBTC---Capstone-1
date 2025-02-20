@@ -8,11 +8,47 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
     exit;
 }
 
-// Get all users except clients
-$query = "SELECT * FROM users WHERE role != 'client' ORDER BY date_created DESC";
+// Get filter and search parameters
+$role_filter = isset($_GET['role']) ? $_GET['role'] : 'all';
+$status_filter = isset($_GET['status']) ? $_GET['status'] : 'all';
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+
+// Build the base query
+$query = "SELECT * FROM users WHERE role != 'client' AND archived = 'No'";
+$params = [];
+
+// Add role filter
+if ($role_filter !== 'all') {
+    $query .= " AND role = ?";
+    $params[] = $role_filter;
+}
+
+// Add status filter
+if ($status_filter !== 'all') {
+    $query .= " AND status = ?";
+    $params[] = $status_filter;
+}
+
+// Add search condition
+if (!empty($search)) {
+    $query .= " AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)";
+    $search_param = "%$search%";
+    $params[] = $search_param;
+    $params[] = $search_param;
+    $params[] = $search_param;
+}
+
+// Add sorting
+$query .= " ORDER BY date_created DESC";
+
+// Prepare and execute the query
 $stmt = $pdo->prepare($query);
-$stmt->execute();
+$stmt->execute($params);
 $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get unique roles for filter dropdown
+$role_stmt = $pdo->query("SELECT DISTINCT role FROM users WHERE role != 'client' ORDER BY role");
+$roles = $role_stmt->fetchAll(PDO::FETCH_COLUMN);
 ?>
 
 <!DOCTYPE html>
@@ -45,10 +81,62 @@ $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div>
                     <h4 class="mb-0">Employee Management</h4>
                 </div>
-                <div>
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
+                <div class="d-flex gap-2">
+                    <a href="archived_employees.php" class="btn btn-secondary">
+                        <i class="fas fa-archive"></i> Archived Employees
+                    </a>
+                    <a href="add_employee_form.php" class="btn btn-primary">
                         <i class="fas fa-user-plus"></i> Add New Employee
-                    </button>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filters and Search -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <!-- Role Filter -->
+                        <div class="col-md-3">
+                            <label class="form-label">Role</label>
+                            <select name="role" class="form-select" onchange="this.form.submit()">
+                                <option value="all" <?php echo $role_filter === 'all' ? 'selected' : ''; ?>>All Roles</option>
+                                <?php foreach ($roles as $role): ?>
+                                    <option value="<?php echo htmlspecialchars($role); ?>" 
+                                            <?php echo $role_filter === $role ? 'selected' : ''; ?>>
+                                        <?php echo ucfirst($role); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <!-- Status Filter -->
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select" onchange="this.form.submit()">
+                                <option value="all" <?php echo $status_filter === 'all' ? 'selected' : ''; ?>>All Status</option>
+                                <option value="active" <?php echo $status_filter === 'active' ? 'selected' : ''; ?>>Active</option>
+                                <option value="inactive" <?php echo $status_filter === 'inactive' ? 'selected' : ''; ?>>Inactive</option>
+                            </select>
+                        </div>
+
+                        <!-- Search -->
+                        <div class="col-md-6">
+                            <label class="form-label">Search</label>
+                            <div class="input-group">
+                                <input type="text" name="search" class="form-control" 
+                                       placeholder="Search by name, email, or phone" 
+                                       value="<?php echo htmlspecialchars($search); ?>">
+                                <button class="btn btn-outline-secondary" type="submit">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                                <?php if (!empty($_GET)): ?>
+                                    <a href="employees.php" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times"></i> Clear
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </form>
                 </div>
             </div>
 
@@ -92,11 +180,13 @@ $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                     <i class="fas fa-edit"></i>
                                                 </button>
                                                 <?php if ($employee['status'] === 'active'): ?>
-                                                    <button type="button" class="btn btn-sm btn-danger" onclick="deactivateEmployee(<?php echo $employee['user_id']; ?>)">
-                                                        <i class="fas fa-user-slash"></i>
+                                                    <button type="button" class="btn btn-sm btn-danger" 
+                                                            onclick="archiveEmployee(<?php echo $employee['user_id']; ?>)">
+                                                        <i class="fas fa-archive"></i>
                                                     </button>
                                                 <?php else: ?>
-                                                    <button type="button" class="btn btn-sm btn-success" onclick="activateEmployee(<?php echo $employee['user_id']; ?>)">
+                                                    <button type="button" class="btn btn-sm btn-success" 
+                                                            onclick="activateEmployee(<?php echo $employee['user_id']; ?>)">
                                                         <i class="fas fa-user-check"></i>
                                                     </button>
                                                 <?php endif; ?>
@@ -105,7 +195,20 @@ $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="7" class="text-center">No employees found</td>
+                                        <td colspan="7" class="text-center py-4">
+                                            <?php if (!empty($search) || $role_filter !== 'all' || $status_filter !== 'all'): ?>
+                                                <div class="text-muted">
+                                                    <i class="fas fa-search me-2"></i>No employees found matching your criteria
+                                                </div>
+                                                <a href="employees.php" class="btn btn-sm btn-outline-primary mt-2">
+                                                    Clear Filters
+                                                </a>
+                                            <?php else: ?>
+                                                <div class="text-muted">
+                                                    <i class="fas fa-users me-2"></i>No employees found
+                                                </div>
+                                            <?php endif; ?>
+                                        </td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
@@ -142,8 +245,11 @@ $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="mb-3">
                             <label class="form-label">Role</label>
                             <select class="form-select" id="editEmployeeRole" required>
-                                <option value="admin">Admin</option>
-                                <option value="staff">Staff</option>
+                                <?php foreach ($roles as $role): ?>
+                                    <option value="<?php echo htmlspecialchars($role); ?>">
+                                        <?php echo ucfirst($role); ?>
+                                    </option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                     </form>
@@ -155,101 +261,5 @@ $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
     </div>
-
-    <!-- Add Employee Modal -->
-    <div class="modal fade" id="addEmployeeModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add New Employee</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="addEmployeeForm" action="add_employee.php" method="POST">
-                        <div class="mb-3">
-                            <label class="form-label">Full Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="name" id="addEmployeeName" required 
-                                   pattern="[A-Za-z\s]+" title="Please enter a valid name (letters and spaces only)">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Email Address <span class="text-danger">*</span></label>
-                            <input type="email" class="form-control" name="email" id="addEmployeeEmail" required>
-                            <div class="form-text">This will be used for login.</div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Phone Number <span class="text-danger">*</span></label>
-                            <input type="tel" class="form-control" name="phone" id="addEmployeePhone" required 
-                                   pattern="[0-9]+" title="Please enter a valid phone number (numbers only)">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Role <span class="text-danger">*</span></label>
-                            <select class="form-select" name="role" id="addEmployeeRole" required>
-                                <option value="">Select Role</option>
-                                <option value="project_manager">Project Manager</option>
-                                <option value="engineer">Engineer</option>
-                                <option value="laborer">Laborer</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Password <span class="text-danger">*</span></label>
-                            <input type="password" class="form-control" name="password" id="addEmployeePassword" required 
-                                   minlength="8">
-                            <div class="form-text">Password must be at least 8 characters long.</div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
-                            <input type="password" class="form-control" id="addEmployeeConfirmPassword" required>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="addEmployee()">Add Employee</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-    function addEmployee() {
-        const form = document.getElementById('addEmployeeForm');
-        const password = document.getElementById('addEmployeePassword').value;
-        const confirmPassword = document.getElementById('addEmployeeConfirmPassword').value;
-        
-        // Validate password match
-        if (password !== confirmPassword) {
-            alert('Passwords do not match!');
-            return;
-        }
-        
-        // Validate password length
-        if (password.length < 8) {
-            alert('Password must be at least 8 characters long!');
-            return;
-        }
-
-        // Create FormData object
-        const formData = new FormData(form);
-
-        // Send AJAX request
-        fetch('add_employee.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Employee added successfully!');
-                window.location.reload();
-            } else {
-                alert(data.message || 'Error adding employee');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error adding employee');
-        });
-    }
-    </script>
 </body>
 </html> 

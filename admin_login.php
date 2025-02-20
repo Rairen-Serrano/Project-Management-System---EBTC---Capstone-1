@@ -15,6 +15,9 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
         case 'project_manager':
             header('Location: manager/dashboard.php');
             break;
+        case 'worker':
+            header('Location: worker/dashboard.php');
+            break;
         default:
             header('Location: index.php');
     }
@@ -46,6 +49,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     break;
                 case 'project_manager':
                     header('Location: manager/dashboard.php');
+                    break;
+                case 'worker':
+                    header('Location: worker/dashboard.php');
                     break;
                 default:
                     header('Location: index.php');

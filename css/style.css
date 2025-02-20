@@ -871,3 +871,197 @@ body {
         margin-left: 220px;
     }
 }
+
+.worker-dashboard-wrapper {
+    min-height: 100vh;
+    background-color: #f8f9fa;
+}
+
+.worker-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1030;
+    background-color: #235347;
+    padding: 0.5rem 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.worker-header .navbar-brand {
+    margin-right: 2rem;
+}
+
+.worker-sidebar {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    bottom: 0;
+    width: 250px;
+    background-color: #fff;
+    box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    z-index: 1020;
+    overflow-y: auto;
+}
+
+.worker-main-content {
+    margin-left: 250px;
+    margin-top: 60px;
+    padding: 2rem;
+    transition: all 0.3s ease;
+}
+
+.worker-sidebar-menu a {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    color: #495057;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.worker-sidebar-menu a:hover,
+.worker-sidebar-menu a.active {
+    background-color: #235347;
+    color: #fff;
+}
+
+.worker-sidebar-menu a i {
+    width: 24px;
+    margin-right: 0.75rem;
+    font-size: 1.1rem;
+}
+
+.worker-sidebar.collapsed {
+    width: 0;
+    overflow: hidden;
+}
+
+.worker-main-content.expanded {
+    margin-left: 0;
+}
+
+@media (max-width: 768px) {
+    .worker-header {
+        padding: 0.5rem 1rem;
+    }
+
+    .worker-header .navbar-brand {
+        margin-right: 1rem;
+    }
+
+    .worker-sidebar {
+        width: 0;
+        overflow: hidden;
+    }
+
+    .worker-sidebar.active {
+        width: 250px;
+    }
+
+    .worker-main-content {
+        margin-left: 0;
+    }
+
+    .worker-main-content.active {
+        margin-left: 250px;
+    }
+}
+
+.technician-dashboard-wrapper {
+    min-height: 100vh;
+    background-color: #f8f9fa;
+}
+
+.technician-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background-color: #235347;
+    z-index: 1000;
+    padding: 0 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.technician-header .navbar-brand {
+    max-width: 200px;
+}
+
+.technician-sidebar {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    bottom: 0;
+    width: 250px;
+    background-color: #fff;
+    box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    z-index: 900;
+    overflow-y: auto;
+}
+
+.technician-main-content {
+    margin-left: 250px;
+    margin-top: 60px;
+    padding: 2rem;
+    transition: all 0.3s ease;
+}
+
+.technician-sidebar-menu a {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    color: #333;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.technician-sidebar-menu a:hover,
+.technician-sidebar-menu a.active {
+    background-color: #235347;
+    color: #fff;
+}
+
+.technician-sidebar-menu a i {
+    width: 24px;
+    margin-right: 10px;
+}
+
+.technician-sidebar.collapsed {
+    width: 0;
+    overflow: hidden;
+}
+
+.technician-main-content.expanded {
+    margin-left: 0;
+}
+
+@media (max-width: 768px) {
+    .technician-header {
+        padding: 0 0.5rem;
+    }
+
+    .technician-header .navbar-brand {
+        max-width: 150px;
+    }
+
+    .technician-sidebar {
+        width: 0;
+        overflow: hidden;
+    }
+
+    .technician-sidebar.active {
+        width: 250px;
+    }
+
+    .technician-main-content {
+        margin-left: 0;
+    }
+
+    .technician-main-content.active {
+        margin-left: 250px;
+    }
+}

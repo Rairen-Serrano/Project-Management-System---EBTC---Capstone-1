@@ -1,6 +1,11 @@
 <?php
 session_start();
 require_once '../dbconnect.php';
+require '../vendor/autoload.php';
+require '../config/mail_config.php';
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
 
 header('Content-Type: application/json');
 
@@ -36,7 +41,7 @@ try {
     }
 
     // Validate role
-    $allowed_roles = ['project_manager', 'engineer', 'laborer'];
+    $allowed_roles = ['project_manager', 'engineer', 'technician', 'worker'];
     if (!in_array($_POST['role'], $allowed_roles)) {
         throw new Exception('Invalid role selected');
     }
@@ -77,10 +82,62 @@ try {
         $_POST['phone']
     ]);
 
-    echo json_encode([
-        'success' => true,
-        'message' => 'Employee added successfully'
-    ]);
+    $new_user_id = $pdo->lastInsertId();
+
+    // Generate a role-specific password format
+    $role_prefix = [
+        'project_manager' => 'PM',
+        'engineer' => 'ENG',
+        'technician' => 'TECH',
+        'worker' => 'WRK'
+    ];
+
+    $generated_password = 'EBTC' . $new_user_id . $role_prefix[$_POST['role']] . substr($_POST['password'], -4);
+
+    // Send welcome email with password using PHPMailer
+    $mail = new PHPMailer(true);
+    
+    try {
+        // Server settings
+        $mail->isSMTP();
+        $mail->Host       = SMTP_HOST;
+        $mail->SMTPAuth   = true;
+        $mail->Username   = SMTP_USERNAME;
+        $mail->Password   = SMTP_PASSWORD;
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+        $mail->Port       = SMTP_PORT;
+
+        $mail->setFrom(SMTP_FROM, SMTP_FROM_NAME);
+        $mail->addAddress(trim($_POST['email']), trim($_POST['name']));
+
+        $mail->isHTML(true);
+        $mail->Subject = "Welcome to EBTC - Your Account Details";
+        $mail->Body = "
+            <div style='font-family: Arial, sans-serif; line-height: 1.6;'>
+                <div style='padding: 20px;'>
+                    <h2 style='color: #235347;'>Welcome to EBTC!</h2>
+                    <p>Dear " . htmlspecialchars($_POST['name']) . ",</p>
+                    <p>Your account has been created successfully. Below are your login credentials:</p>
+                    <p><strong>Email:</strong> " . htmlspecialchars($_POST['email']) . "</p>
+                    <p><strong>Password:</strong> <span style='background: #f4f4f4; padding: 10px; margin: 10px 0; display: inline-block;'>" 
+                        . htmlspecialchars($generated_password) . "</span></p>
+                    <p>For security reasons, please change your password after your first login.</p>
+                    <p>Best regards,<br>EBTC Admin Team</p>
+                </div>
+            </div>
+        ";
+
+        $mail->send();
+        echo json_encode([
+            'success' => true,
+            'message' => 'Employee added successfully and welcome email sent'
+        ]);
+    } catch (Exception $e) {
+        echo json_encode([
+            'success' => true,
+            'message' => 'Employee added successfully, but welcome email could not be sent: ' . $mail->ErrorInfo
+        ]);
+    }
 
 } catch (Exception $e) {
     echo json_encode([

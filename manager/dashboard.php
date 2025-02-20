@@ -61,7 +61,7 @@ if (empty($user['pin_code'])) {
                                     <i class="fas fa-project-diagram fa-2x"></i>
                                 </div>
                             </div>
-                        </div>
+                    </div>
                 </div>
             </div>
             <div class="col-md-3">
@@ -76,7 +76,7 @@ if (empty($user['pin_code'])) {
                                     <i class="fas fa-users fa-2x"></i>
                                 </div>
                             </div>
-                        </div>
+                    </div>
                 </div>
             </div>
             <div class="col-md-3">
@@ -91,7 +91,7 @@ if (empty($user['pin_code'])) {
                                     <i class="fas fa-tasks fa-2x"></i>
                                 </div>
                             </div>
-                        </div>
+                    </div>
                 </div>
             </div>
             <div class="col-md-3">

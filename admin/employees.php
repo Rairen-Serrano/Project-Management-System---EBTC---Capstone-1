@@ -165,29 +165,40 @@ $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="addEmployeeForm">
+                    <form id="addEmployeeForm" action="add_employee.php" method="POST">
                         <div class="mb-3">
-                            <label class="form-label">Name</label>
-                            <input type="text" class="form-control" id="addEmployeeName" required>
+                            <label class="form-label">Full Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="name" id="addEmployeeName" required 
+                                   pattern="[A-Za-z\s]+" title="Please enter a valid name (letters and spaces only)">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Email</label>
-                            <input type="email" class="form-control" id="addEmployeeEmail" required>
+                            <label class="form-label">Email Address <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" name="email" id="addEmployeeEmail" required>
+                            <div class="form-text">This will be used for login.</div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Phone</label>
-                            <input type="tel" class="form-control" id="addEmployeePhone" required>
+                            <label class="form-label">Phone Number <span class="text-danger">*</span></label>
+                            <input type="tel" class="form-control" name="phone" id="addEmployeePhone" required 
+                                   pattern="[0-9]+" title="Please enter a valid phone number (numbers only)">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Role</label>
-                            <select class="form-select" id="addEmployeeRole" required>
-                                <option value="admin">Admin</option>
-                                <option value="staff">Staff</option>
+                            <label class="form-label">Role <span class="text-danger">*</span></label>
+                            <select class="form-select" name="role" id="addEmployeeRole" required>
+                                <option value="">Select Role</option>
+                                <option value="project_manager">Project Manager</option>
+                                <option value="engineer">Engineer</option>
+                                <option value="laborer">Laborer</option>
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Password</label>
-                            <input type="password" class="form-control" id="addEmployeePassword" required>
+                            <label class="form-label">Password <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" name="password" id="addEmployeePassword" required 
+                                   minlength="8">
+                            <div class="form-text">Password must be at least 8 characters long.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="addEmployeeConfirmPassword" required>
                         </div>
                     </form>
                 </div>
@@ -198,5 +209,47 @@ $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
     </div>
+
+    <script>
+    function addEmployee() {
+        const form = document.getElementById('addEmployeeForm');
+        const password = document.getElementById('addEmployeePassword').value;
+        const confirmPassword = document.getElementById('addEmployeeConfirmPassword').value;
+        
+        // Validate password match
+        if (password !== confirmPassword) {
+            alert('Passwords do not match!');
+            return;
+        }
+        
+        // Validate password length
+        if (password.length < 8) {
+            alert('Password must be at least 8 characters long!');
+            return;
+        }
+
+        // Create FormData object
+        const formData = new FormData(form);
+
+        // Send AJAX request
+        fetch('add_employee.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Employee added successfully!');
+                window.location.reload();
+            } else {
+                alert(data.message || 'Error adding employee');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error adding employee');
+        });
+    }
+    </script>
 </body>
 </html> 

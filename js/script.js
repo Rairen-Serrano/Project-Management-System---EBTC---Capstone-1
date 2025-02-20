@@ -45,6 +45,9 @@ document.addEventListener('DOMContentLoaded', function() {
         case 'adminSettingsPage':
             handleAdminSettingsPage();
             break;
+        case 'managerProjectsPage':
+            handleManagerProjectsPage();
+            break;
         // Add more cases as needed
     }
 
@@ -1417,7 +1420,6 @@ function updateProject() {
 
     const formData = new FormData();
     formData.append('project_id', projectId);
-    formData.append('status', document.getElementById('modalStatus').textContent.toLowerCase().replace(' ', '_'));
     formData.append('notes', document.getElementById('modalNotes').value);
 
     // Add file if one is selected
@@ -1426,7 +1428,7 @@ function updateProject() {
         formData.append('quotation_file', fileInput.files[0]);
     }
 
-    fetch('../admin/update_project.php', {
+    fetch('update_project.php', {
         method: 'POST',
         body: formData
     })
@@ -1453,14 +1455,13 @@ function removeQuotationFile() {
     const projectId = window.currentProjectId;
     if (!projectId) return;
 
-    fetch('../admin/remove_quotation_file.php', {
+    const formData = new FormData();
+    formData.append('project_id', projectId);
+    formData.append('remove_quotation', 'true');
+
+    fetch('update_project.php', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            project_id: projectId
-        })
+        body: formData
     })
     .then(response => response.json())
     .then(data => {
@@ -1480,27 +1481,35 @@ function removeQuotationFile() {
 }
 
 // Add appointment to projects
-function addToProjects(appointmentData) {
-    fetch('../admin/add_to_projects.php', {
+function addToProjects(appointmentId) {
+    if (!confirm('Are you sure you want to add this appointment as a project?')) {
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('appointment_id', appointmentId);
+
+    fetch('add_project.php', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(appointmentData)
+        body: formData
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Close modal and reload page
-            document.querySelector('#selectAppointmentModal .btn-close').click();
-            location.reload();
+            // Close the modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('selectAppointmentModal'));
+            modal.hide();
+            
+            // Show success message and reload
+            alert(data.message);
+            window.location.reload();
         } else {
-            alert('Failed to add to projects: ' + data.message);
+            alert('Error: ' + data.message);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Failed to add to projects');
+        alert('An error occurred while adding the project');
     });
 }
 
@@ -1803,177 +1812,181 @@ function handleAdminDashboardPage() {
             });
         });
     }
-}
 
-function handleManagerDashboardPage() {
-    const mainContent = document.querySelector('.manager-main-content');
-    const pinSetupModal = document.getElementById('pinSetupModal');
-    const pinVerificationModal = document.getElementById('pinVerificationModal');
-
-    // Only proceed with PIN setup if the modal exists and we need PIN setup
-    if (pinSetupModal && mainContent.style.display === 'none' && document.body.dataset.needsPinSetup === 'true') {
-        const setupModal = new bootstrap.Modal(pinSetupModal);
-        const setupPinInputs = document.querySelectorAll('.setup-pin');
-        const confirmPinInputs = document.querySelectorAll('.confirm-pin');
+    // Add Employee functionality
+    function addEmployee() {
+        const form = document.getElementById('addEmployeeForm');
+        const password = document.getElementById('addEmployeePassword').value;
+        const confirmPassword = document.getElementById('addEmployeeConfirmPassword').value;
         
-        setupModal.show();
+        // Password match validation
+        if (password !== confirmPassword) {
+            alert('Passwords do not match');
+            return;
+        }
 
-        // Handle PIN input navigation for setup
-        [setupPinInputs, confirmPinInputs].forEach(inputGroup => {
-            inputGroup.forEach((input, index) => {
-                input.addEventListener('input', function() {
-                    if (this.value && index < inputGroup.length - 1) {
-                        inputGroup[index + 1].focus();
-                    }
-                });
+        // Create FormData object
+        const formData = new FormData(form);
 
-                input.addEventListener('keydown', function(e) {
-                    if (e.key === 'Backspace' && !this.value && index > 0) {
-                        inputGroup[index - 1].focus();
-                    }
-                });
-            });
-        });
-
-        // Handle PIN setup submission
-        document.getElementById('savePinBtn').addEventListener('click', function() {
-            const setupPin = Array.from(setupPinInputs).map(input => input.value).join('');
-            const confirmPin = Array.from(confirmPinInputs).map(input => input.value).join('');
-
-            if (setupPin !== confirmPin) {
-                document.getElementById('pinSetupError').textContent = 'PINs do not match';
-                document.getElementById('pinSetupError').style.display = 'block';
-                return;
+        // Send AJAX request
+        fetch('add_employee.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Employee added successfully!');
+                window.location.reload();
+            } else {
+                alert(data.message || 'Error adding employee');
             }
-
-            if (setupPin.length !== 4) {
-                document.getElementById('pinSetupError').textContent = 'PIN must be 4 digits';
-                document.getElementById('pinSetupError').style.display = 'block';
-                return;
-            }
-
-            // Make an AJAX call to save the PIN
-            fetch('setup_pin.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'pin=' + setupPin
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    mainContent.style.display = 'block';
-                    setupModal.hide();
-                } else {
-                    document.getElementById('pinSetupError').textContent = data.message || 'Error setting PIN';
-                    document.getElementById('pinSetupError').style.display = 'block';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('pinSetupError').textContent = 'Error setting PIN';
-                document.getElementById('pinSetupError').style.display = 'block';
-            });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error adding employee');
         });
     }
 
-    // Show PIN verification modal if needed (only if we don't need PIN setup)
-    if (pinVerificationModal && mainContent.style.display === 'none' && document.body.dataset.needsPinSetup !== 'true') {
-        const verifyModal = new bootstrap.Modal(pinVerificationModal);
-        verifyModal.show();
+    // Password visibility toggle function
+    function togglePassword(inputId, button) {
+        const input = document.getElementById(inputId);
+        const icon = button.querySelector('i');
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
 
-        // Handle PIN input navigation
-        const pinInputs = document.querySelectorAll('.pin-input:not(.setup-pin):not(.confirm-pin)');
-        pinInputs.forEach((input, index) => {
-            input.addEventListener('input', function() {
-                if (this.value && index < pinInputs.length - 1) {
-                    pinInputs[index + 1].focus();
-                }
-            });
-
-            input.addEventListener('keydown', function(e) {
-                if (e.key === 'Backspace' && !this.value && index > 0) {
-                    pinInputs[index - 1].focus();
-                }
-            });
-        });
-
-        // Handle PIN verification
-        document.getElementById('verifyPinBtn').addEventListener('click', function() {
-            let pin = Array.from(pinInputs).map(input => input.value).join('');
-            
-            // Make an AJAX call to verify the PIN
-            fetch('verify_pin.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'pin=' + pin
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    mainContent.style.display = 'block';
-                    verifyModal.hide();
+    // Simple password match check
+    const passwordInput = document.getElementById('addEmployeePassword');
+    const confirmPasswordInput = document.getElementById('addEmployeeConfirmPassword');
+    
+    if (confirmPasswordInput) {
+        confirmPasswordInput.addEventListener('input', function() {
+            const matchIndicator = this.parentElement.nextElementSibling;
+            if (this.value) {
+                if (this.value === passwordInput.value) {
+                    matchIndicator.innerHTML = '<i class="fas fa-check text-success"></i> Passwords match';
+                    matchIndicator.className = 'password-match mt-2 small text-success';
                 } else {
-                    document.getElementById('pinError').style.display = 'block';
-                    pinInputs.forEach(input => input.value = '');
-                    pinInputs[0].focus();
+                    matchIndicator.innerHTML = '<i class="fas fa-times text-danger"></i> Passwords do not match';
+                    matchIndicator.className = 'password-match mt-2 small text-danger';
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
+            } else {
+                matchIndicator.innerHTML = '';
+            }
         });
     }
+
+    // Make functions globally available
+    window.addEmployee = addEmployee;
+    window.togglePassword = togglePassword;
+
+    
 }
 
-function handleAdminSettingsPage() {
-    const changePinForm = document.getElementById('changePinForm');
-    if (changePinForm) {
-        // Handle PIN input navigation for all PIN input groups
-        const pinInputGroups = [
-            document.querySelectorAll('.current-pin'),
-            document.querySelectorAll('.new-pin'),
-            document.querySelectorAll('.confirm-pin')
-        ];
+function handleManagerProjectsPage() {
+    // Initialize the view project modal
+    window.viewProjectModal = new bootstrap.Modal(document.getElementById('viewProjectModal'));
+    window.currentProjectId = null;
 
-        pinInputGroups.forEach(inputGroup => {
-            inputGroup.forEach((input, index) => {
-                input.addEventListener('input', function() {
-                    if (this.value && index < inputGroup.length - 1) {
-                        inputGroup[index + 1].focus();
-                    }
-                });
+    // Add event listener for when modal is hidden
+    document.getElementById('viewProjectModal').addEventListener('hidden.bs.modal', function () {
+        // Clear modal content
+        document.getElementById('modalClientName').textContent = '';
+        document.getElementById('modalClientEmail').textContent = '';
+        document.getElementById('modalClientPhone').textContent = '';
+        document.getElementById('modalService').textContent = '';
+        document.getElementById('modalDate').textContent = '';
+        document.getElementById('modalTime').textContent = '';
+        document.getElementById('modalStatus').textContent = '';
+        document.getElementById('modalNotes').value = '';
+        document.getElementById('quotationFileInput').value = '';
+        document.getElementById('currentQuotationFile').style.display = 'none';
+        window.currentProjectId = null;
+    });
+}
 
-                input.addEventListener('keydown', function(e) {
-                    if (e.key === 'Backspace' && !this.value && index > 0) {
-                        inputGroup[index - 1].focus();
-                    }
-                });
-            });
-        });
+function viewProject(project) {
+    // Store current project ID
+    window.currentProjectId = project.project_id;
 
-        // Handle form submission
-        changePinForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            // Combine PIN inputs into hidden fields
-            document.getElementById('current_pin').value = Array.from(document.querySelectorAll('.current-pin'))
-                .map(input => input.value)
-                .join('');
-
-            document.getElementById('new_pin').value = Array.from(document.querySelectorAll('.new-pin'))
-                .map(input => input.value)
-                .join('');
-
-            document.getElementById('confirm_pin').value = Array.from(document.querySelectorAll('.confirm-pin'))
-                .map(input => input.value)
-                .join('');
-
-            // Submit the form
-            this.submit();
-        });
+    // Update modal content with project details
+    document.getElementById('modalClientName').textContent = project.client_name;
+    document.getElementById('modalClientEmail').textContent = project.client_email;
+    document.getElementById('modalClientPhone').textContent = project.client_phone;
+    document.getElementById('modalService').textContent = project.service;
+    
+    // Format date and time
+    const date = new Date(project.date);
+    const time = new Date(`2000-01-01T${project.time}`);
+    
+    document.getElementById('modalDate').textContent = date.toLocaleDateString('en-US', { 
+        month: 'long', 
+        day: 'numeric', 
+        year: 'numeric' 
+    });
+    document.getElementById('modalTime').textContent = time.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true 
+    });
+    
+    // Update status with badge
+    const statusBadge = document.createElement('span');
+    statusBadge.className = 'badge bg-primary px-3 py-2';
+    statusBadge.textContent = 'Ongoing';
+    document.getElementById('modalStatus').innerHTML = '';
+    document.getElementById('modalStatus').appendChild(statusBadge);
+    
+    // Update notes
+    document.getElementById('modalNotes').value = project.notes || '';
+    
+    // Update quotation file display
+    if (project.quotation_file) {
+        document.getElementById('currentQuotationFile').style.display = 'block';
+        document.getElementById('quotationFileLink').href = '../uploads/quotations/' + project.quotation_file;
+        document.getElementById('uploadQuotationFile').style.display = 'none';
+    } else {
+        document.getElementById('currentQuotationFile').style.display = 'none';
+        document.getElementById('uploadQuotationFile').style.display = 'block';
     }
+    
+    // Show the modal
+    window.viewProjectModal.show();
+}
+
+function updateProjectStatus(projectId, currentStatus) {
+    if (!confirm('Are you sure you want to ' + (currentStatus === 'ongoing' ? 'complete' : 'reopen') + ' this project?')) {
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('project_id', projectId);
+    formData.append('current_status', currentStatus);
+
+    fetch('update_project_status.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while updating the project status');
+    });
 }

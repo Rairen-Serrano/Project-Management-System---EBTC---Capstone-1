@@ -50,10 +50,18 @@ switch($date_filter) {
         break;
 }
 
-// Add search filter
+// Add search filter for multiple fields
 if (!empty($search)) {
-    $query .= " AND (u.name LIKE ? OR u.email LIKE ? OR a.service LIKE ?)";
+    $query .= " AND (
+        u.name LIKE ? OR 
+        a.service LIKE ? OR 
+        a.status LIKE ? OR 
+        DATE_FORMAT(a.date, '%M %d, %Y') LIKE ? OR 
+        DATE_FORMAT(a.time, '%h:%i %p') LIKE ?
+    )";
     $search_param = "%$search%";
+    $params[] = $search_param;
+    $params[] = $search_param;
     $params[] = $search_param;
     $params[] = $search_param;
     $params[] = $search_param;
@@ -112,9 +120,7 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <select name="status" class="form-select" onchange="this.form.submit()">
                                 <option value="all" <?php echo $status_filter === 'all' ? 'selected' : ''; ?>>All Status</option>
                                 <option value="pending" <?php echo $status_filter === 'pending' ? 'selected' : ''; ?>>Pending</option>
-                                <option value="confirmed" <?php echo $status_filter === 'confirmed' ? 'selected' : ''; ?>>Confirmed</option>
                                 <option value="cancelled" <?php echo $status_filter === 'cancelled' ? 'selected' : ''; ?>>Cancelled</option>
-                                <option value="completed" <?php echo $status_filter === 'completed' ? 'selected' : ''; ?>>Completed</option>
                             </select>
                         </div>
 
@@ -134,11 +140,23 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="col-md-6">
                             <label class="form-label">Search</label>
                             <div class="input-group">
-                                <input type="text" name="search" class="form-control" placeholder="Search by client name, email, or service" value="<?php echo htmlspecialchars($search); ?>">
+                                <input type="text" name="search" class="form-control" 
+                                    placeholder="Search by client name, service, status, or date/time" 
+                                    value="<?php echo htmlspecialchars($search); ?>">
                                 <button class="btn btn-outline-secondary" type="submit">
                                     <i class="fas fa-search"></i>
                                 </button>
                             </div>
+                            <?php if (!empty($search)): ?>
+                            <div class="form-text">
+                                <small>
+                                    Searching for: "<?php echo htmlspecialchars($search); ?>"
+                                    <a href="?status=<?php echo $status_filter; ?>&date=<?php echo $date_filter; ?>" class="text-decoration-none">
+                                        <i class="fas fa-times-circle"></i> Clear search
+                                    </a>
+                                </small>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </form>
                 </div>
@@ -151,27 +169,46 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
-                                    <th style="width: 25%">Client</th>
-                                    <th style="width: 50%">Service</th>
+                                    <th style="width: 20%">Client</th>
+                                    <th style="width: 30%">Service</th>
                                     <th style="width: 15%">Date & Time</th>
+                                    <th style="width: 15%">Status</th>
                                     <th style="width: 10%">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (empty($appointments)): ?>
                                 <tr>
-                                    <td colspan="4" class="text-center py-4">No appointments found</td>
+                                    <td colspan="5" class="text-center py-4">No appointments found</td>
                                 </tr>
                                 <?php else: ?>
                                     <?php foreach ($appointments as $appointment): ?>
                                     <tr>
                                         <td><?php echo htmlspecialchars($appointment['client_name']); ?></td>
-                                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;"><?php echo htmlspecialchars($appointment['service']); ?></td>
+                                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                            <?php echo htmlspecialchars($appointment['service']); ?>
+                                        </td>
                                         <td>
                                             <div class="fs-6"><?php echo date('M d, Y', strtotime($appointment['date'])); ?></div>
                                             <div class="text-muted"><?php echo date('h:i A', strtotime($appointment['time'])); ?></div>
                                         </td>
                                         <td>
+                                            <?php
+                                            $statusClass = '';
+                                            switch($appointment['status']) {
+                                                case 'pending':
+                                                    $statusClass = 'bg-warning';
+                                                    break;
+                                                case 'cancelled':
+                                                    $statusClass = 'bg-danger';
+                                                    break;
+                                            }
+                                            ?>
+                                            <span class="badge <?php echo $statusClass; ?> px-3 py-2">
+                                                <?php echo ucfirst($appointment['status']); ?>
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
                                             <button type="button" class="btn btn-sm btn-info" onclick='viewAppointment(<?php echo json_encode($appointment); ?>)'>
                                                 <i class="fas fa-eye"></i>
                                             </button>

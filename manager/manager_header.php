@@ -54,10 +54,6 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'project_manager') {
             <i class="fas fa-project-diagram"></i>
             Projects
         </a>
-        <a href="tasks.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'tasks.php' ? 'active' : ''; ?>">
-            <i class="fas fa-tasks"></i>
-            Tasks
-        </a>
         <a href="team.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'team.php' ? 'active' : ''; ?>">
             <i class="fas fa-users"></i>
             Team Members

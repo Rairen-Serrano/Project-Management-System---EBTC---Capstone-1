@@ -26,7 +26,7 @@ if (empty($user['pin_code'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Project Manager Dashboard | EBTC PMS</title>
-
+    
     <!-- CSS -->
     <link rel="stylesheet" href="../css/style.css">
 
@@ -35,7 +35,7 @@ if (empty($user['pin_code'])) {
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
+    
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../js/script.js"></script>
@@ -44,14 +44,14 @@ if (empty($user['pin_code'])) {
     <div class="manager-dashboard-wrapper">
         <!-- Include manager header -->
         <?php include 'manager_header.php'; ?>
-        
-        <!-- Main Content -->
+
+    <!-- Main Content -->
         <div class="manager-main-content" <?php echo !isset($_SESSION['pin_verified']) ? 'style="display: none;"' : ''; ?>>
             <!-- Statistics Cards -->
             <div class="row g-4 mb-4">
-                <div class="col-md-3">
-                    <div class="card bg-primary text-white">
-                        <div class="card-body">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="card-title mb-1">Total Projects</h6>
@@ -62,11 +62,11 @@ if (empty($user['pin_code'])) {
                                 </div>
                             </div>
                         </div>
-                    </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card bg-success text-white">
-                        <div class="card-body">
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="card-title mb-1">Team Members</h6>
@@ -77,11 +77,11 @@ if (empty($user['pin_code'])) {
                                 </div>
                             </div>
                         </div>
-                    </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card bg-warning text-white">
-                        <div class="card-body">
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="card-title mb-1">Total Tasks</h6>
@@ -92,11 +92,11 @@ if (empty($user['pin_code'])) {
                                 </div>
                             </div>
                         </div>
-                    </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card bg-info text-white">
-                        <div class="card-body">
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="card-title mb-1">Pending Tasks</h6>
@@ -113,31 +113,31 @@ if (empty($user['pin_code'])) {
 
             <!-- Recent Activity -->
             <div class="row">
-                <div class="col-md-8">
-                    <div class="card">
-                        <div class="card-header">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
                             <h5 class="card-title mb-0">Recent Projects</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
                                 <table class="table table-hover align-middle">
-                                    <thead>
-                                        <tr>
+                                <thead>
+                                    <tr>
                                             <th>Project</th>
-                                            <th>Team Lead</th>
-                                            <th>Progress</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
+                                        <th>Team Lead</th>
+                                        <th>Progress</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
                                             <td>Website Redesign</td>
                                             <td>John Smith</td>
-                                            <td>
-                                                <div class="progress" style="height: 5px;">
-                                                    <div class="progress-bar" role="progressbar" style="width: 75%"></div>
-                                                </div>
-                                            </td>
+                                        <td>
+                                            <div class="progress" style="height: 5px;">
+                                                <div class="progress-bar" role="progressbar" style="width: 75%"></div>
+                                            </div>
+                                        </td>
                                             <td>
                                                 <span class="badge bg-success">On Track</span>
                                             </td>
@@ -153,33 +153,33 @@ if (empty($user['pin_code'])) {
                                             <td>
                                                 <span class="badge bg-warning">Delayed</span>
                                             </td>
-                                        </tr>
-                                        <tr>
+                                    </tr>
+                                    <tr>
                                             <td>Database Migration</td>
                                             <td>Mike Wilson</td>
-                                            <td>
-                                                <div class="progress" style="height: 5px;">
+                                        <td>
+                                            <div class="progress" style="height: 5px;">
                                                     <div class="progress-bar" role="progressbar" style="width: 90%"></div>
-                                                </div>
-                                            </td>
+                                            </div>
+                                        </td>
                                             <td>
                                                 <span class="badge bg-info">Completed</span>
                                             </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
+            </div>
 
                 <!-- Quick Actions -->
-                <div class="col-md-4">
-                    <div class="card">
-                        <div class="card-header">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
                             <h5 class="card-title mb-0">Quick Actions</h5>
-                        </div>
-                        <div class="card-body">
+                    </div>
+                    <div class="card-body">
                             <div class="d-grid gap-2">
                                 <a href="add_project.php" class="btn btn-primary">
                                     <i class="fas fa-plus me-2"></i>Add New Project

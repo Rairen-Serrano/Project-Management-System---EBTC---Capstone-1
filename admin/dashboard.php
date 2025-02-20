@@ -233,9 +233,9 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="card-body">
                             <div class="d-grid gap-2">
-                                <a href="add_employee.php" class="btn btn-primary">
+                                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
                                     <i class="fas fa-user-plus me-2"></i>Add Employee
-                                </a>
+                                </button>
                                 <a href="archived_appointments.php" class="btn btn-secondary">
                                     <i class="fas fa-archive me-2"></i>View Archived Appointments
                                 </a>
@@ -250,7 +250,7 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-    <!-- PIN Verification Modal -->
+        <!-- PIN Verification Modal -->
     <div class="modal fade" id="pinVerificationModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -318,5 +318,106 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
     </div>
+
+    <!-- Add Employee Modal -->
+    <div class="modal fade" id="addEmployeeModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title">
+                        <i class="fas fa-user-plus me-2"></i>Add New Employee
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addEmployeeForm" action="add_employee.php" method="POST">
+                        <!-- Personal Information Section -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-user me-2"></i>Personal Information
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Full Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" name="name" id="addEmployeeName" required 
+                                           pattern="[A-Za-z\s]+" title="Please enter a valid name (letters and spaces only)">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Phone Number <span class="text-danger">*</span></label>
+                                    <input type="tel" class="form-control" name="phone" id="addEmployeePhone" required 
+                                           pattern="[0-9]+" title="Please enter a valid phone number (numbers only)">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Account Information Section -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-id-card me-2"></i>Account Information
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Email Address <span class="text-danger">*</span></label>
+                                    <input type="email" class="form-control" name="email" id="addEmployeeEmail" required>
+                                    <div class="form-text">This will be used for login.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Role <span class="text-danger">*</span></label>
+                                    <select class="form-select" name="role" id="addEmployeeRole" required>
+                                        <option value="">Select Role</option>
+                                        <option value="project_manager">Project Manager</option>
+                                        <option value="engineer">Engineer</option>
+                                        <option value="laborer">Laborer</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Password Section -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-lock me-2"></i>Set Password
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Password <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="password" class="form-control" name="password" id="addEmployeePassword" required>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('addEmployeePassword', this)">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="password" class="form-control" id="addEmployeeConfirmPassword" required>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('addEmployeeConfirmPassword', this)">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                    <div class="password-match mt-2"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="addEmployee()">
+                        <i class="fas fa-plus me-2"></i>Add Employee
+                    </button>
+                </div>
+                </div>
+            </div>
+        </div>
 </body>
 </html> 

@@ -21,6 +21,4 @@ if (file_exists($default_image_path)) {
     $default_photo = file_get_contents($default_image_path);
     $stmt = $pdo->prepare("UPDATE users SET profile_photo = ? WHERE role = 'client' AND profile_photo IS NULL");
     $stmt->execute([$default_photo]);
-}
-
-?> 
+} 

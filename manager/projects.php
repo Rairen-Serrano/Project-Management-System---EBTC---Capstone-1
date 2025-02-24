@@ -256,9 +256,35 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="col-12">
                             <div class="card">
                                 <div class="card-body">
-                                    <h6 class="card-title mb-3">
-                                        <i class="fas fa-users me-2"></i>Assigned Personnel
-                                    </h6>
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="card-title mb-0">
+                                            <i class="fas fa-users me-2"></i>Assigned Personnel
+                                        </h6>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="showPersonnelSearch()">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Search Personnel Form (Hidden by default) -->
+                                    <div id="personnelSearchForm" class="mb-3" style="display: none;">
+                                        <div class="position-relative">
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="personnelSearchInput" 
+                                                    placeholder="Search by name or email..." autocomplete="off">
+                                                <button class="btn btn-outline-secondary" type="button" onclick="searchPersonnel()">
+                                                    <i class="fas fa-search"></i>
+                                                </button>
+                                            </div>
+                                            <!-- Suggestions Dropdown -->
+                                            <div id="searchSuggestions" class="position-absolute w-100 mt-1 d-none">
+                                                <div class="list-group shadow-sm" style="max-height: 200px; overflow-y: auto;">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- Search Results -->
+                                        <div id="personnelSearchResults" class="mt-2"></div>
+                                    </div>
+
                                     <div class="table-responsive">
                                         <table class="table table-hover">
                                             <thead>
@@ -278,6 +304,9 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-success me-2" onclick="redirectToTaskAssignment()">
+                        <i class="fas fa-tasks me-2"></i>Assign Tasks
+                    </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
@@ -521,6 +550,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     let currentAppointment = null;
     let assignPersonnelModal = null;
     let viewProjectModal = null;
+    let currentProjectId = null; // Add this to store current project ID
 
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize modals
@@ -685,6 +715,9 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 throw new Error('No project data provided');
             }
 
+            // Store the project ID for use in other functions
+            currentProjectId = project.project_id;
+
             // Fill in the modal with project details
             document.getElementById('modalClientName').textContent = project.client_name || 'N/A';
             document.getElementById('modalClientEmail').textContent = project.client_email || 'N/A';
@@ -804,6 +837,291 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             alert('There was an error viewing the project details. Please try again.');
         }
     }
+
+    function assignAdditionalPersonnel() {
+        if (!currentProjectId) {
+            alert('No project selected');
+            return;
+        }
+
+        // Close the view modal
+        viewProjectModal.hide();
+
+        // Get all available personnel
+        const personnelSelects = document.querySelectorAll('.personnel-select');
+        
+        // Show the assign personnel modal
+        const assignModal = new bootstrap.Modal(document.getElementById('assignPersonnelModal'));
+        
+        // Clear previous selections
+        personnelSelects.forEach(checkbox => checkbox.checked = false);
+        document.getElementById('selectAllPersonnel').checked = false;
+        
+        // Update modal title and button text for additional assignment
+        document.querySelector('#assignPersonnelModal .modal-title').innerHTML = 
+            '<i class="fas fa-user-plus me-2"></i>Assign Additional Personnel';
+        
+        // Change the confirm button action
+        const confirmButton = document.querySelector('#assignPersonnelModal .btn-primary');
+        confirmButton.textContent = 'Assign Additional Personnel';
+        confirmButton.onclick = confirmAdditionalPersonnelAssignment;
+        
+        assignModal.show();
+    }
+
+    function confirmAdditionalPersonnelAssignment() {
+        // Get selected personnel
+        const selectedPersonnel = Array.from(document.querySelectorAll('.personnel-select:checked'))
+            .map(checkbox => checkbox.value);
+
+        if (selectedPersonnel.length === 0) {
+            alert('Please select at least one personnel to assign to the project.');
+            return;
+        }
+
+        // Create FormData object
+        const formData = new FormData();
+        formData.append('project_id', currentProjectId);
+        formData.append('personnel', JSON.stringify(selectedPersonnel));
+
+        // Send request to assign additional personnel
+        fetch('assign_additional_personnel.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const assignModal = bootstrap.Modal.getInstance(document.getElementById('assignPersonnelModal'));
+                assignModal.hide();
+                alert('Additional personnel assigned successfully!');
+                location.reload();
+            } else {
+                alert(data.message || 'Failed to assign additional personnel');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to assign additional personnel');
+        });
+    }
+
+    function redirectToTaskAssignment() {
+        if (!currentProjectId) {
+            alert('No project selected');
+            return;
+        }
+        
+        // Redirect to the task assignment page with the project ID
+        window.location.href = `assign_tasks.php?project_id=${currentProjectId}`;
+    }
+
+    let searchTimeout = null;
+
+    function showPersonnelSearch() {
+        const searchForm = document.getElementById('personnelSearchForm');
+        const searchInput = document.getElementById('personnelSearchInput');
+        searchForm.style.display = 'block';
+        searchInput.focus();
+        
+        // Clear previous search
+        document.getElementById('personnelSearchResults').innerHTML = '';
+        document.getElementById('searchSuggestions').classList.add('d-none');
+        searchInput.value = '';
+
+        // Add input event listener for suggestions
+        searchInput.addEventListener('input', handleSearchInput);
+        
+        // Add click event listener to document to hide suggestions when clicking outside
+        document.addEventListener('click', handleClickOutside);
+    }
+
+    function handleClickOutside(event) {
+        const suggestions = document.getElementById('searchSuggestions');
+        const searchInput = document.getElementById('personnelSearchInput');
+        
+        if (!suggestions.contains(event.target) && event.target !== searchInput) {
+            suggestions.classList.add('d-none');
+        }
+    }
+
+    function handleSearchInput(event) {
+        const searchTerm = event.target.value.trim();
+        const suggestions = document.getElementById('searchSuggestions');
+        
+        // Clear previous timeout
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+
+        // Hide suggestions if search term is empty
+        if (!searchTerm) {
+            suggestions.classList.add('d-none');
+            return;
+        }
+
+        // Set new timeout for search
+        searchTimeout = setTimeout(() => {
+            fetchSuggestions(searchTerm);
+        }, 300); // Wait 300ms after user stops typing
+    }
+
+    function fetchSuggestions(searchTerm) {
+        const formData = new FormData();
+        formData.append('search_term', searchTerm);
+        formData.append('project_id', currentProjectId);
+
+        fetch('search_personnel.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            const suggestions = document.getElementById('searchSuggestions');
+            const suggestionsList = suggestions.querySelector('.list-group');
+            suggestionsList.innerHTML = '';
+
+            if (data.success && data.personnel.length > 0) {
+                data.personnel.forEach(person => {
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'list-group-item list-group-item-action';
+                    item.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-bold">${person.name}</div>
+                                <small class="text-muted">${person.email}</small>
+                            </div>
+                            <span class="badge bg-secondary">${person.role}</span>
+                        </div>
+                    `;
+                    
+                    // Add click handler for suggestion
+                    item.addEventListener('click', () => {
+                        assignPersonnel(person.user_id);
+                    });
+                    
+                    suggestionsList.appendChild(item);
+                });
+                
+                suggestions.classList.remove('d-none');
+            } else {
+                suggestions.classList.add('d-none');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching suggestions:', error);
+        });
+    }
+
+    function searchPersonnel() {
+        const searchTerm = document.getElementById('personnelSearchInput').value.trim();
+        if (!searchTerm) {
+            alert('Please enter a search term');
+            return;
+        }
+
+        // Hide suggestions
+        document.getElementById('searchSuggestions').classList.add('d-none');
+
+        // Create FormData object
+        const formData = new FormData();
+        formData.append('search_term', searchTerm);
+        formData.append('project_id', currentProjectId);
+
+        // Send search request
+        fetch('search_personnel.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            const resultsDiv = document.getElementById('personnelSearchResults');
+            resultsDiv.innerHTML = ''; // Clear previous results
+
+            if (data.success && data.personnel.length > 0) {
+                const ul = document.createElement('ul');
+                ul.className = 'list-group mt-2';
+
+                data.personnel.forEach(person => {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                    li.innerHTML = `
+                        <div>
+                            <strong>${person.name}</strong>
+                            <br>
+                            <small class="text-muted">${person.email}</small>
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="assignPersonnel(${person.user_id})">
+                            <i class="fas fa-plus"></i> Add
+                        </button>
+                    `;
+                    ul.appendChild(li);
+                });
+
+                resultsDiv.appendChild(ul);
+            } else {
+                resultsDiv.innerHTML = `
+                    <div class="alert alert-info mt-2">
+                        <i class="fas fa-info-circle me-2"></i>
+                        No personnel found matching "${searchTerm}"
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to search personnel');
+        });
+    }
+
+    function assignPersonnel(userId) {
+        if (!currentProjectId || !userId) {
+            alert('Missing required information');
+            return;
+        }
+
+        // Create FormData object
+        const formData = new FormData();
+        formData.append('project_id', currentProjectId);
+        formData.append('personnel', JSON.stringify([userId]));
+
+        // Send request to assign personnel
+        fetch('assign_additional_personnel.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Clear search
+                document.getElementById('personnelSearchInput').value = '';
+                document.getElementById('personnelSearchResults').innerHTML = '';
+                document.getElementById('personnelSearchForm').style.display = 'none';
+                document.getElementById('searchSuggestions').classList.add('d-none');
+                
+                // Refresh the project details
+                alert('Personnel assigned successfully!');
+                location.reload();
+            } else {
+                alert(data.message || 'Failed to assign personnel');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to assign personnel');
+        });
+    }
+
+    // Add event listener for search input
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('personnelSearchInput');
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchPersonnel();
+            }
+        });
+    });
     </script>
 </body>
 </html> 

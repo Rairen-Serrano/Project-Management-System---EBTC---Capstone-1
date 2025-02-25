@@ -304,8 +304,8 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-success me-2" onclick="redirectToTaskAssignment()">
-                        <i class="fas fa-tasks me-2"></i>Assign Tasks
+                    <button type="button" class="btn btn-success me-2" onclick="redirectToTaskManagement()">
+                        <i class="fas fa-tasks me-2"></i>Task Management
                     </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
@@ -906,14 +906,14 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         });
     }
 
-    function redirectToTaskAssignment() {
+    function redirectToTaskManagement() {
         if (!currentProjectId) {
             alert('No project selected');
             return;
         }
         
-        // Redirect to the task assignment page with the project ID
-        window.location.href = `assign_tasks.php?project_id=${currentProjectId}`;
+        // Redirect to the task management page with the project ID
+        window.location.href = `task_management.php?project_id=${currentProjectId}`;
     }
 
     let searchTimeout = null;

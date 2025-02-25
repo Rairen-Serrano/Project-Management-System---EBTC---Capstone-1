@@ -84,16 +84,6 @@ try {
 
     $new_user_id = $pdo->lastInsertId();
 
-    // Generate a role-specific password format
-    $role_prefix = [
-        'project_manager' => 'PM',
-        'engineer' => 'ENG',
-        'technician' => 'TECH',
-        'worker' => 'WRK'
-    ];
-
-    $generated_password = 'EBTC' . $new_user_id . $role_prefix[$_POST['role']] . substr($_POST['password'], -4);
-
     // Send welcome email with password using PHPMailer
     $mail = new PHPMailer(true);
     
@@ -120,7 +110,7 @@ try {
                     <p>Your account has been created successfully. Below are your login credentials:</p>
                     <p><strong>Email:</strong> " . htmlspecialchars($_POST['email']) . "</p>
                     <p><strong>Password:</strong> <span style='background: #f4f4f4; padding: 10px; margin: 10px 0; display: inline-block;'>" 
-                        . htmlspecialchars($generated_password) . "</span></p>
+                        . htmlspecialchars($_POST['password']) . "</span></p>
                     <p>For security reasons, please change your password after your first login.</p>
                     <p>Best regards,<br>EBTC Admin Team</p>
                 </div>

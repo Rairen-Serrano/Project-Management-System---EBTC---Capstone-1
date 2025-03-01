@@ -137,6 +137,38 @@ function handleGet() {
                 echo json_encode(['timeline' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
                 break;
 
+            case 'personnel':
+                // Get task ID if provided
+                $task_id = $_GET['task_id'] ?? null;
+                
+                // Base query to get project personnel
+                $query = "
+                    SELECT DISTINCT u.user_id, u.name, u.role
+                    FROM project_personnel pp
+                    JOIN users u ON pp.user_id = u.user_id
+                    WHERE pp.project_id = ?
+                    AND u.role NOT IN ('client', 'admin', 'project_manager')
+                ";
+                
+                // If task ID is provided, exclude personnel already assigned to the task
+                if ($task_id) {
+                    $query .= " AND u.user_id NOT IN (
+                        SELECT user_id FROM task_assignees WHERE task_id = ?
+                    )";
+                }
+                
+                $query .= " ORDER BY u.name ASC";
+                
+                $stmt = $pdo->prepare($query);
+                if ($task_id) {
+                    $stmt->execute([$project_id, $task_id]);
+                } else {
+                    $stmt->execute([$project_id]);
+                }
+                
+                echo json_encode(['personnel' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+                break;
+
             default:
                 http_response_code(400);
                 echo json_encode(['error' => 'Invalid action']);
@@ -197,6 +229,22 @@ function handlePost($data) {
                     return;
                 }
 
+                // Validate that all assignees are project personnel
+                $stmt = $pdo->prepare("
+                    SELECT COUNT(*) as count
+                    FROM project_personnel
+                    WHERE project_id = ? AND user_id IN (" . implode(',', array_fill(0, count($data['assignees']), '?')) . ")
+                ");
+                $params = array_merge([$project_id], $data['assignees']);
+                $stmt->execute($params);
+                $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($result['count'] !== count($data['assignees'])) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Invalid assignees. Only project personnel can be assigned to tasks.']);
+                    return;
+                }
+
                 // Start transaction
                 $pdo->beginTransaction();
 
@@ -239,6 +287,86 @@ function handlePost($data) {
                     $pdo->rollBack();
                     throw $e;
                 }
+                break;
+
+            case 'add_assignee':
+                if (empty($data['task_id']) || empty($data['user_id'])) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Task ID and User ID are required']);
+                    return;
+                }
+
+                // Verify task belongs to project
+                $stmt = $pdo->prepare("SELECT project_id FROM tasks WHERE task_id = ?");
+                $stmt->execute([$data['task_id']]);
+                $task = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$task || $task['project_id'] != $project_id) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Invalid task']);
+                    return;
+                }
+
+                // Verify user is project personnel
+                $stmt = $pdo->prepare("
+                    SELECT COUNT(*) as count 
+                    FROM project_personnel 
+                    WHERE project_id = ? AND user_id = ?
+                ");
+                $stmt->execute([$project_id, $data['user_id']]);
+                $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($result['count'] === 0) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Invalid assignee. Only project personnel can be assigned to tasks.']);
+                    return;
+                }
+
+                // Add assignee
+                $stmt = $pdo->prepare("
+                    INSERT INTO task_assignees (task_id, user_id)
+                    SELECT ?, ?
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM task_assignees 
+                        WHERE task_id = ? AND user_id = ?
+                    )
+                ");
+                $stmt->execute([
+                    $data['task_id'], 
+                    $data['user_id'],
+                    $data['task_id'],
+                    $data['user_id']
+                ]);
+
+                echo json_encode(['success' => true]);
+                break;
+
+            case 'remove_assignee':
+                if (empty($data['task_id']) || empty($data['user_id'])) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Task ID and User ID are required']);
+                    return;
+                }
+
+                // Verify task belongs to project
+                $stmt = $pdo->prepare("SELECT project_id FROM tasks WHERE task_id = ?");
+                $stmt->execute([$data['task_id']]);
+                $task = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$task || $task['project_id'] != $project_id) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Invalid task']);
+                    return;
+                }
+
+                // Remove assignee
+                $stmt = $pdo->prepare("
+                    DELETE FROM task_assignees 
+                    WHERE task_id = ? AND user_id = ?
+                ");
+                $stmt->execute([$data['task_id'], $data['user_id']]);
+
+                echo json_encode(['success' => true]);
                 break;
 
             default:
@@ -332,45 +460,40 @@ function handleDelete() {
     
     if (!$project_id || !$id) {
         http_response_code(400);
-        echo json_encode(['error' => 'Project ID and item ID are required']);
+        echo json_encode(['error' => 'Project ID and Task/Category ID are required']);
         return;
     }
 
     try {
         switch ($action) {
-            case 'category':
-                // Check if category has tasks
-                $stmt = $pdo->prepare("
-                    SELECT COUNT(*) FROM tasks 
-                    WHERE project_id = ? AND category_id = ?
-                ");
+            case 'task':
+                // Verify task belongs to project
+                $stmt = $pdo->prepare("SELECT task_id FROM tasks WHERE project_id = ? AND task_id = ?");
                 $stmt->execute([$project_id, $id]);
-                
-                if ($stmt->fetchColumn() > 0) {
+                if (!$stmt->fetch()) {
                     http_response_code(400);
-                    echo json_encode(['error' => 'Cannot delete category with existing tasks']);
+                    echo json_encode(['error' => 'Task not found']);
                     return;
                 }
 
-                // Delete category
-                $stmt = $pdo->prepare("
-                    DELETE FROM task_categories 
-                    WHERE project_id = ? AND category_id = ?
-                ");
-                $stmt->execute([$project_id, $id]);
-                
-                echo json_encode(['success' => true]);
-                break;
+                // Start transaction
+                $pdo->beginTransaction();
 
-            case 'task':
-                // Delete task
-                $stmt = $pdo->prepare("
-                    DELETE FROM tasks 
-                    WHERE project_id = ? AND task_id = ?
-                ");
-                $stmt->execute([$project_id, $id]);
-                
-                echo json_encode(['success' => true]);
+                try {
+                    // Delete task assignees first
+                    $stmt = $pdo->prepare("DELETE FROM task_assignees WHERE task_id = ?");
+                    $stmt->execute([$id]);
+
+                    // Delete task
+                    $stmt = $pdo->prepare("DELETE FROM tasks WHERE task_id = ?");
+                    $stmt->execute([$id]);
+
+                    $pdo->commit();
+                    echo json_encode(['success' => true]);
+                } catch (Exception $e) {
+                    $pdo->rollBack();
+                    throw $e;
+                }
                 break;
 
             default:

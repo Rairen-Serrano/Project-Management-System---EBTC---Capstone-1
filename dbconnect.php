@@ -11,9 +11,11 @@ try {
     die("Connection failed: " . $e->getMessage());
 }
 
-// Set default PIN code for clients
-$stmt = $pdo->prepare("UPDATE users SET pin_code = '1234' WHERE role = 'client' AND (pin_code IS NULL OR pin_code = '')");
-$stmt->execute();
+// Set default hashed PIN code for clients
+$default_pin = '1234';
+$hashed_default_pin = password_hash($default_pin, PASSWORD_DEFAULT);
+$stmt = $pdo->prepare("UPDATE users SET pin_code = ? WHERE role = 'client' AND (pin_code IS NULL OR pin_code = '')");
+$stmt->execute([$hashed_default_pin]);
 
 // Set default profile photo for clients who don't have one
 $default_image_path = 'images/default_profile.jpg';

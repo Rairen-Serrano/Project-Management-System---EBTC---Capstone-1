@@ -48,6 +48,16 @@ document.addEventListener('DOMContentLoaded', function() {
         case 'managerProjectsPage':
             handleManagerProjectsPage();
             break;
+        case 'engineerDashboardPage':
+            handleEngineerDashboardPage();
+            if (document.body.dataset.needsPinSetup === 'true') {
+                console.log('PIN setup needed'); // Debug log
+                setupPin();
+            }
+            break;
+        case 'taskManagementPage':
+            handleTaskManagementPage();
+            break;
         // Add more cases as needed
     }
 
@@ -57,6 +67,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize admin dashboard functionality if on admin dashboard page
     if (document.getElementById('adminDashboardPage')) {
         handleAdminDashboardPage();
+    }
+
+    // Add page initialization
+    if (document.getElementById('engineerTasksPage')) {
+        handleEngineerTasksPage();
     }
 });
 
@@ -1975,4 +1990,685 @@ function deleteEmployee(userId) {
         console.error('Error:', error);
         alert('Error deleting employee');
     });
+}
+
+// Mobile Sidebar Toggle
+document.addEventListener('DOMContentLoaded', function() {
+    const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
+    const engineerSidebar = document.querySelector('.engineer-sidebar');
+    
+    if (mobileSidebarToggle && engineerSidebar) {
+        mobileSidebarToggle.addEventListener('click', function() {
+            engineerSidebar.classList.toggle('show');
+        });
+
+        // Close sidebar when clicking outside
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth < 992 && // Only on mobile
+                !engineerSidebar.contains(e.target) && // Not clicking inside sidebar
+                !mobileSidebarToggle.contains(e.target) && // Not clicking toggle button
+                engineerSidebar.classList.contains('show')) { // Sidebar is open
+                engineerSidebar.classList.remove('show');
+            }
+        });
+    }
+});
+
+// Engineer Dashboard Functions
+function handleEngineerDashboardPage() {
+    // Initialize sidebar toggle
+    const sidebarToggle = document.getElementById('headerSidebarToggle');
+    const sidebar = document.querySelector('.engineer-sidebar');
+    const mainContent = document.querySelector('.engineer-main-content');
+    
+    if (sidebarToggle && sidebar && mainContent) {
+        // Check if PIN setup/verification is needed
+        if (document.body.querySelector('[data-needs-pin-setup="true"]')) {
+            const pinSetupModal = new bootstrap.Modal(document.getElementById('pinSetupModal'));
+            pinSetupModal.show();
+            setupPin();
+        } else if (document.querySelector('.engineer-main-content[style*="display: none"]') && !sessionStorage.getItem('pin_verified')) {
+            const pinVerificationModal = new bootstrap.Modal(document.getElementById('pinVerificationModal'));
+            pinVerificationModal.show();
+            setupPinVerification();
+        }
+
+        // Rest of the sidebar toggle code...
+    }
+
+    // Load dashboard data
+    loadEngineerStats();
+    loadCurrentTasks();
+    loadUpcomingDeadlines();
+    loadProjectProgress();
+}
+
+async function loadEngineerStats() {
+    try {
+        const response = await fetch('../engineer/api/engineer_stats.php');
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('activeTasks').textContent = data.active_tasks;
+            document.getElementById('completedTasks').textContent = data.completed_tasks;
+            document.getElementById('pendingTasks').textContent = data.pending_tasks;
+            document.getElementById('totalProjects').textContent = data.total_projects;
+        } else {
+            throw new Error(data.error || 'Failed to load statistics');
+        }
+    } catch (error) {
+        console.error('Error loading engineer stats:', error);
+    }
+}
+
+async function loadCurrentTasks() {
+    try {
+        const response = await fetch('../engineer/api/engineer_tasks.php');
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to load tasks');
+        }
+
+        const tasksTable = document.getElementById('currentTasksTable');
+        tasksTable.innerHTML = '';
+
+        if (data.tasks.length === 0) {
+            tasksTable.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        <i class="fas fa-tasks fa-2x mb-3 d-block"></i>
+                        No tasks assigned
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        data.tasks.forEach(task => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <div class="d-flex flex-column">
+                        <strong>${escapeHtml(task.task_name)}</strong>
+                        <small class="text-muted text-truncate" style="max-width: 300px;" title="${escapeHtml(task.description || '')}">${escapeHtml(task.description || '')}</small>
+                    </div>
+                </td>
+                <td>
+                    <div class="d-flex flex-column">
+                        <span>${escapeHtml(task.service)}</span>
+                        <small class="text-muted">${escapeHtml(task.category_name || 'No Category')}</small>
+                    </div>
+                </td>
+                <td>
+                    <div class="d-flex flex-column">
+                        <span>${formatDate(task.due_date)}</span>
+                        <small class="text-${getDaysUntilDue(task.due_date) <= 2 ? 'danger' : 'muted'}">
+                            ${getDaysUntilDue(task.due_date)} day${getDaysUntilDue(task.due_date) !== 1 ? 's' : ''} left
+                        </small>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge ${getStatusBadgeClass(task.status)}">
+                        ${capitalizeFirst(task.status)}
+                    </span>
+                </td>
+                <td>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewTaskDetails(${task.task_id})" title="View Details">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        ${task.status !== 'completed' ? `
+                            <button class="btn btn-sm btn-outline-success" onclick="toggleTaskStatus(${task.task_id}, '${task.status}')" title="Mark as Completed">
+                                <i class="fas fa-check"></i>
+                            </button>
+                        ` : `
+                            <button class="btn btn-sm btn-outline-warning" onclick="toggleTaskStatus(${task.task_id}, '${task.status}')" title="Mark as Pending">
+                                <i class="fas fa-undo"></i>
+                            </button>
+                        `}
+                    </div>
+                </td>
+            `;
+            tasksTable.appendChild(row);
+        });
+    } catch (error) {
+        console.error('Error loading current tasks:', error);
+        tasksTable.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-danger py-4">
+                    <i class="fas fa-exclamation-circle fa-2x mb-3 d-block"></i>
+                    Failed to load tasks. Please try again later.
+                </td>
+            </tr>
+        `;
+    }
+}
+
+async function loadUpcomingDeadlines() {
+    try {
+        const response = await fetch('../engineer/api/engineer_deadlines.php');
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to load deadlines');
+        }
+
+        const deadlinesList = document.getElementById('upcomingDeadlines');
+        deadlinesList.innerHTML = '';
+
+        if (data.deadlines.length === 0) {
+            deadlinesList.innerHTML = `
+                <div class="list-group-item text-center text-muted">
+                    No upcoming deadlines
+                </div>
+            `;
+            return;
+        }
+
+        data.deadlines.forEach(task => {
+            const daysUntil = getDaysUntilDue(task.due_date);
+            const item = document.createElement('a');
+            item.href = '#';
+            item.className = 'list-group-item list-group-item-action';
+            item.onclick = (e) => {
+                e.preventDefault();
+                viewTaskDetails(task.task_id);
+            };
+            item.innerHTML = `
+                <div class="d-flex w-100 justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">${escapeHtml(task.task_name)}</h6>
+                        <small class="text-muted">${escapeHtml(task.project_name)}</small>
+                    </div>
+                    <small class="text-${daysUntil <= 2 ? 'danger' : 'warning'} fw-bold">
+                        ${daysUntil} day${daysUntil !== 1 ? 's' : ''} left
+                    </small>
+                </div>
+            `;
+            deadlinesList.appendChild(item);
+        });
+    } catch (error) {
+        console.error('Error loading upcoming deadlines:', error);
+    }
+}
+
+async function loadProjectProgress() {
+    try {
+        const response = await fetch('../engineer/api/engineer_projects.php');
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to load project progress');
+        }
+
+        const progressList = document.getElementById('projectProgressList');
+        progressList.innerHTML = '';
+
+        if (data.projects.length === 0) {
+            progressList.innerHTML = `
+                <div class="text-center text-muted">
+                    No active projects
+                </div>
+            `;
+            return;
+        }
+
+        data.projects.forEach(project => {
+            const div = document.createElement('div');
+            div.className = 'mb-3';
+            div.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <div>
+                        <h6 class="mb-0">${escapeHtml(project.service)}</h6>
+                        <small class="text-muted">${escapeHtml(project.project_name)}</small>
+                    </div>
+                    <span class="text-muted">${project.progress || 0}%</span>
+                </div>
+                <div class="progress" style="height: 5px;">
+                    <div class="progress-bar bg-success" 
+                         role="progressbar" 
+                         style="width: ${project.progress || 0}%" 
+                         aria-valuenow="${project.progress || 0}" 
+                         aria-valuemin="0" 
+                         aria-valuemax="100">
+                    </div>
+                </div>
+            `;
+            progressList.appendChild(div);
+        });
+    } catch (error) {
+        console.error('Error loading project progress:', error);
+    }
+}
+
+async function toggleTaskStatus(taskId, currentStatus) {
+    try {
+        const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+        const response = await fetch('../engineer/api/update_task_status.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                task_id: taskId,
+                current_status: currentStatus,
+                status: newStatus
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to update task status');
+        }
+
+        // Reload tasks and statistics
+        loadTasks();
+        if (typeof loadEngineerStats === 'function') {
+            loadEngineerStats();
+            loadProjectProgress();
+        }
+
+        showAlert('success', `Task marked as ${newStatus}`);
+    } catch (error) {
+        console.error('Error updating task status:', error);
+        showAlert('error', 'Failed to update task status');
+    }
+}
+
+function viewTaskDetails(taskId) {
+    // Implement task details view functionality
+    console.log('View task details:', taskId);
+}
+
+function setupPinVerification() {
+    const inputs = document.querySelectorAll('#pinVerificationModal .pin-input');
+    setupPinInputBehavior(inputs);
+
+    const verifyPinBtn = document.getElementById('verifyPinBtn');
+    if (!verifyPinBtn) return;
+
+    verifyPinBtn.addEventListener('click', async function() {
+        const pin = Array.from(inputs).map(input => input.value).join('');
+        
+        if (pin.length !== 4) {
+            showVerificationError('Please enter all 4 digits');
+            return;
+        }
+
+        try {
+            const response = await fetch('../api/auth/verify_pin.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ pin: pin })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Store verification in sessionStorage
+                sessionStorage.setItem('pin_verified', 'true');
+                
+                // Hide modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('pinVerificationModal'));
+                modal.hide();
+
+                // Show main content
+                document.querySelector('.engineer-main-content').style.display = 'block';
+                
+                // Show success message
+                showAlert('success', 'PIN verified successfully!');
+            } else {
+                showVerificationError('Invalid PIN');
+                inputs.forEach(input => input.value = '');
+                inputs[0].focus();
+            }
+        } catch (error) {
+            console.error('Error verifying PIN:', error);
+            showVerificationError('Error verifying PIN');
+        }
+    });
+}
+
+function setupPinInputBehavior(inputs) {
+    inputs.forEach((input, index) => {
+        // Only allow numbers
+        input.addEventListener('input', function(e) {
+            if (e.target.value.length > 0) {
+                const value = e.target.value.replace(/[^0-9]/g, '');
+                e.target.value = value.slice(-1);
+                
+                // Move to next input if available
+                if (value && index < inputs.length - 1) {
+                    inputs[index + 1].focus();
+                }
+            }
+        });
+
+        // Handle backspace
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                inputs[index - 1].focus();
+            }
+        });
+    });
+}
+
+function showSetupError(message) {
+    const errorDiv = document.getElementById('pinSetupError');
+    if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        
+        // Hide error after 3 seconds
+        setTimeout(() => {
+            errorDiv.style.display = 'none';
+        }, 3000);
+    }
+}
+
+function setupPin() {
+    console.log('Setting up PIN functionality');
+    
+    const setupInputs = document.querySelectorAll('.setup-pin');
+    const confirmInputs = document.querySelectorAll('.confirm-pin');
+    const pinSetupModal = document.getElementById('pinSetupModal');
+    
+    if (!setupInputs.length || !confirmInputs.length) {
+        console.error('PIN input elements not found');
+        return;
+    }
+
+    console.log('Found PIN inputs:', setupInputs.length, confirmInputs.length);
+    
+    setupPinInputBehavior(setupInputs);
+    setupPinInputBehavior(confirmInputs);
+
+    const savePinBtn = document.getElementById('savePinBtn');
+    if (!savePinBtn) {
+        console.error('Save PIN button not found');
+        return;
+    }
+
+    savePinBtn.addEventListener('click', async function() {
+        console.log('Save PIN button clicked');
+        
+        const pin = Array.from(setupInputs)
+            .map(input => input.value)
+            .join('');
+        
+        const confirmPin = Array.from(confirmInputs)
+            .map(input => input.value)
+            .join('');
+        
+        console.log('PIN:', pin.length, 'Confirm PIN:', confirmPin.length);
+
+        if (pin.length !== 4 || confirmPin.length !== 4) {
+            showSetupError('Please enter all 4 digits for both PINs');
+            return;
+        }
+
+        if (pin !== confirmPin) {
+            showSetupError('PINs do not match');
+            return;
+        }
+
+        try {
+            console.log('Sending PIN setup request...');
+            const response = await fetch('../api/auth/setup_pin.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ pin: pin })
+            });
+
+            const data = await response.json();
+            console.log('Server response:', data);
+
+            if (data.success) {
+                // Hide the modal
+                const bsModal = bootstrap.Modal.getInstance(pinSetupModal);
+                if (bsModal) {
+                    bsModal.hide();
+                }
+
+                // Show success message
+                showAlert('success', 'PIN setup successful!');
+                
+                // Clear inputs
+                setupInputs.forEach(input => input.value = '');
+                confirmInputs.forEach(input => input.value = '');
+                
+                // Show the main content
+                document.querySelector('.engineer-main-content').style.display = 'block';
+                
+                // Reload the page after a short delay
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showSetupError(data.error || 'Failed to set up PIN');
+            }
+        } catch (error) {
+            console.error('Error setting up PIN:', error);
+            showSetupError('Failed to set up PIN. Please try again.');
+        }
+    });
+}
+
+// ... existing code ...
+
+// Helper Functions
+function showAlert(type, message) {
+    // Create alert element
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.role = 'alert';
+    
+    // Add message
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    // Find or create alert container
+    let alertContainer = document.getElementById('alertContainer');
+    if (!alertContainer) {
+        alertContainer = document.createElement('div');
+        alertContainer.id = 'alertContainer';
+        alertContainer.style.position = 'fixed';
+        alertContainer.style.top = '20px';
+        alertContainer.style.right = '20px';
+        alertContainer.style.zIndex = '1050';
+        document.body.appendChild(alertContainer);
+    }
+    
+    // Add alert to container
+    alertContainer.appendChild(alertDiv);
+    
+    // Auto dismiss after 5 seconds
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric'
+    });
+}
+
+function getDaysUntilDue(dateString) {
+    const dueDate = new Date(dateString);
+    const today = new Date();
+    const diffTime = dueDate - today;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+function getStatusBadgeClass(status) {
+    const classes = {
+        'pending': 'bg-warning',
+        'in_progress': 'bg-primary',
+        'completed': 'bg-success',
+        'overdue': 'bg-danger'
+    };
+    return classes[status] || 'bg-secondary';
+}
+
+function capitalizeFirst(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1).replace('_', ' ');
+}
+
+function handleEngineerTasksPage() {
+    // Check if PIN setup/verification is needed
+    if (document.body.querySelector('[data-needs-pin-setup="true"]')) {
+        const pinSetupModal = new bootstrap.Modal(document.getElementById('pinSetupModal'));
+        pinSetupModal.show();
+        setupPin();
+    } else if (document.querySelector('.engineer-main-content[style*="display: none"]') && !sessionStorage.getItem('pin_verified')) {
+        const pinVerificationModal = new bootstrap.Modal(document.getElementById('pinVerificationModal'));
+        pinVerificationModal.show();
+        setupPinVerification();
+    }
+
+    // Load initial tasks
+    loadTasks();
+
+    // Set up event listeners for filters
+    const statusFilter = document.getElementById('statusFilter');
+    const projectFilter = document.getElementById('projectFilter');
+
+    if (statusFilter) {
+        statusFilter.addEventListener('change', () => loadTasks());
+    }
+    if (projectFilter) {
+        projectFilter.addEventListener('change', () => loadTasks());
+    }
+}
+
+async function loadTasks() {
+    const tasksTableBody = document.getElementById('tasksTableBody');
+    const loadingRow = document.getElementById('loadingTasks');
+    const noTasksMessage = document.getElementById('noTasksMessage');
+
+    if (!tasksTableBody || !loadingRow || !noTasksMessage) {
+        console.error('Required elements not found');
+        return;
+    }
+
+    try {
+        const statusFilter = document.getElementById('statusFilter');
+        const projectFilter = document.getElementById('projectFilter');
+        
+        const status = statusFilter ? statusFilter.value : 'all';
+        const projectId = projectFilter ? projectFilter.value : 'all';
+        
+        // Show loading state
+        loadingRow.style.display = 'table-row';
+        noTasksMessage.style.display = 'none';
+        
+        const response = await fetch(`../engineer/api/get_tasks.php?status=${status}&project_id=${projectId}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to load tasks');
+        }
+
+        // Update project filter options if available
+        if (data.projects && projectFilter) {
+            const currentValue = projectFilter.value;
+            projectFilter.innerHTML = '<option value="all">All Projects</option>';
+            data.projects.forEach(project => {
+                projectFilter.innerHTML += `<option value="${escapeHtml(project.project_id)}">${escapeHtml(project.project_name)}</option>`;
+            });
+            projectFilter.value = currentValue;
+        }
+
+        // Hide loading state
+        loadingRow.style.display = 'none';
+
+        // Clear existing tasks except for the loading and no tasks messages
+        const existingRows = tasksTableBody.querySelectorAll('tr:not(#loadingTasks):not(#noTasksMessage)');
+        existingRows.forEach(row => row.remove());
+
+        if (!data.tasks || data.tasks.length === 0) {
+            noTasksMessage.style.display = 'table-row';
+            return;
+        }
+
+        // Add tasks to the table
+        data.tasks.forEach(task => {
+            const daysUntilDue = getDaysUntilDue(task.due_date);
+            const isUrgent = daysUntilDue <= 2 && task.status !== 'completed';
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <div class="d-flex flex-column">
+                        <span class="fw-medium ${isUrgent ? 'text-danger' : ''}">${escapeHtml(task.task_name)}</span>
+                        <small class="text-muted text-truncate" style="max-width: 300px;" title="${escapeHtml(task.description)}">
+                            ${escapeHtml(task.description)}
+                        </small>
+                    </div>
+                </td>
+                <td>
+                    <div class="d-flex flex-column">
+                        <span>${escapeHtml(task.project_name)}</span>
+                        <small class="text-muted">${escapeHtml(task.client_name || '')}</small>
+                    </div>
+                </td>
+                <td>
+                    <div class="d-flex flex-column">
+                        <span>${formatDate(task.due_date)}</span>
+                        <small class="${isUrgent ? 'text-danger' : 'text-muted'}">
+                            ${daysUntilDue === 0 ? 'Due today' : 
+                              daysUntilDue < 0 ? `${Math.abs(daysUntilDue)} days overdue` :
+                              `${daysUntilDue} days left`}
+                        </small>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge ${getStatusBadgeClass(task.status)}">
+                        ${capitalizeFirst(task.status.replace('_', ' '))}
+                    </span>
+                </td>
+                <td>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-primary" 
+                                onclick="viewTaskDetails(${task.task_id})"
+                                title="View Details">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-sm ${task.status === 'completed' ? 'btn-outline-warning' : 'btn-outline-success'}" 
+                                onclick="toggleTaskStatus(${task.task_id}, '${task.status}')"
+                                title="${task.status === 'completed' ? 'Mark as Pending' : 'Mark as Completed'}">
+                            <i class="fas ${task.status === 'completed' ? 'fa-undo' : 'fa-check'}"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+            tasksTableBody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('Error loading tasks:', error);
+        loadingRow.style.display = 'none';
+        noTasksMessage.style.display = 'table-row';
+        noTasksMessage.querySelector('p').textContent = 'Error loading tasks. Please try again.';
+    }
 }

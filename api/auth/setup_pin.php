@@ -2,47 +2,38 @@
 session_start();
 require_once '../../dbconnect.php';
 
-// Check if user is logged in
-if (!isset($_SESSION['logged_in']) || !isset($_SESSION['role'])) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized access']);
-    exit;
-}
+header('Content-Type: application/json');
 
-// Check if request is POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed']);
+    echo json_encode(['success' => false, 'message' => 'Invalid request method']);
     exit;
 }
 
-// Get request data
+// Get the PIN from the request body
 $data = json_decode(file_get_contents('php://input'), true);
+$pin = $data['pin'] ?? '';
 
-if (!isset($data['pin']) || strlen($data['pin']) !== 4 || !is_numeric($data['pin'])) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Invalid PIN format. PIN must be 4 digits.']);
+if (empty($pin) || strlen($pin) !== 4 || !is_numeric($pin)) {
+    echo json_encode(['success' => false, 'message' => 'Invalid PIN format']);
     exit;
 }
 
 try {
-    $user_id = $_SESSION['user_id'];
-    $pin = $data['pin'];
+    // Hash the PIN before storing
+    $hashedPin = password_hash($pin, PASSWORD_DEFAULT);
     
-    // Hash the PIN using password_hash
-    $hashed_pin = password_hash($pin, PASSWORD_DEFAULT);
-
-    // Update user's PIN with hashed value
+    // Update the user's PIN in the database
     $stmt = $pdo->prepare("UPDATE users SET pin_code = ? WHERE user_id = ?");
-    $stmt->execute([$hashed_pin, $user_id]);
+    $result = $stmt->execute([$hashedPin, $_SESSION['user_id']]);
 
-    // Set session variable to indicate PIN is verified
-    $_SESSION['pin_verified'] = true;
-    unset($_SESSION['needs_pin_setup']);
-
-    echo json_encode(['success' => true]);
-
+    if ($result) {
+        $_SESSION['pin_verified'] = true;
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Failed to save PIN']);
+    }
 } catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
-} 
+    error_log("PIN setup error: " . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Database error']);
+}
+?> 

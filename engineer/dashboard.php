@@ -4,6 +4,9 @@ require_once '../dbconnect.php';
 
 // Check if user is logged in and is an engineer
 if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'engineer') {
+    // Clear session and redirect to login
+    session_unset();
+    session_destroy();
     header('Location: ../admin_login.php');
     exit;
 }
@@ -39,6 +42,9 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../js/script.js"></script>
@@ -50,6 +56,18 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
 
     <!-- Main Content -->
         <div class="engineer-main-content" <?php echo !isset($_SESSION['pin_verified']) ? 'style="display: none;"' : ''; ?>>
+            <!-- Welcome Section -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <h4 class="welcome-message">Welcome back, <?php echo htmlspecialchars($_SESSION['name']); ?>!</h4>
+                            <p class="mb-0">Here's your project overview for today</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Statistics Cards -->
             <div class="row g-4 mb-4">
             <div class="col-md-3">
@@ -59,6 +77,7 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                                 <div>
                                     <h6 class="card-title mb-1">Active Tasks</h6>
                                     <h2 class="mb-0" id="activeTasks">0</h2>
+                                    <small>Tasks in progress</small>
                                 </div>
                                 <div class="card-icon">
                                     <i class="fas fa-tasks fa-2x"></i>
@@ -114,39 +133,237 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                 </div>
             </div>
 
-            <!-- Current Tasks and Project Progress -->
+            <!-- Main Dashboard Content -->
             <div class="row">
             <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header">
-                            <h5 class="card-title mb-0">Current Tasks</h5>
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Current Tasks</h5>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary active" data-status="all">All</button>
+                            <button class="btn btn-sm btn-outline-primary" data-status="in_progress">In Progress</button>
+                            <button class="btn btn-sm btn-outline-primary" data-status="pending">Pending</button>
+                            <button class="btn btn-sm btn-outline-primary" data-status="completed">Completed</button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
-                                <table class="table table-hover align-middle">
+                            <table class="table table-hover align-middle">
                                 <thead>
                                     <tr>
-                                            <th style="width: 35%">Task</th>
-                                            <th style="width: 25%">Project</th>
-                                            <th style="width: 20%">Due Date</th>
-                                            <th style="width: 10%">Status</th>
-                                            <th style="width: 10%">Actions</th>
+                                        <th>Task Name</th>
+                                        <th>Project</th>
+                                        <th>Assigned Date</th>
+                                        <th>Due Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
-                                    <tbody id="currentTasksTable">
-                                        <!-- Tasks will be loaded dynamically -->
+                                <tbody>
+                                    <?php
+                                    // Fetch tasks assigned to the current engineer
+                                    $stmt = $pdo->prepare("
+                                        SELECT 
+                                            t.task_id,
+                                            t.task_name,
+                                            t.description,
+                                            t.due_date,
+                                            t.status,
+                                            p.project_id,
+                                            p.service,
+                                            ta.assigned_date
+                                        FROM tasks t
+                                        JOIN task_assignees ta ON t.task_id = ta.task_id
+                                        JOIN projects p ON t.project_id = p.project_id
+                                        WHERE ta.user_id = ?
+                                        ORDER BY t.due_date ASC
+                                    ");
+                                    $stmt->execute([$_SESSION['user_id']]);
+                                    $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                                    foreach ($tasks as $task) {
+                                        // Determine status class
+                                        $statusClass = match($task['status']) {
+                                            'Completed' => 'bg-success',
+                                            'In Progress' => 'bg-primary',
+                                            'Pending' => 'bg-warning',
+                                            default => 'bg-secondary'
+                                        };
+
+                                        // Calculate days remaining
+                                        $dueDate = new DateTime($task['due_date']);
+                                        $today = new DateTime();
+                                        $isOverdue = $today > $dueDate && $task['status'] !== 'Completed';
+                                        ?>
+                                        <tr class="task-row" data-status="<?php echo strtolower(str_replace(' ', '_', $task['status'])); ?>">
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div>
+                                                        <h6 class="mb-0"><?php echo htmlspecialchars($task['task_name']); ?></h6>
+                                                        <small class="text-muted"><?php echo htmlspecialchars(substr($task['description'], 0, 50)) . '...'; ?></small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <a href="project_details.php?id=<?php echo $task['project_id']; ?>" class="text-decoration-none">
+                                                    <?php echo htmlspecialchars($task['service']); ?>
+                                                </a>
+                                            </td>
+                                            <td><?php echo date('M d, Y', strtotime($task['assigned_date'])); ?></td>
+                                            <td>
+                                                <div class="<?php echo $isOverdue ? 'text-danger' : ''; ?>">
+                                                    <?php echo date('M d, Y', strtotime($task['due_date'])); ?>
+                                                    <?php if ($isOverdue): ?>
+                                                        <span class="badge bg-danger">Overdue</span>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge <?php echo $statusClass; ?>">
+                                                    <?php echo $task['status']; ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
+                                                        <i class="fas fa-ellipsis-v"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu">
+                                                        <li>
+                                                            <a class="dropdown-item" href="task_details.php?id=<?php echo $task['task_id']; ?>">
+                                                                <i class="fas fa-eye me-2"></i>View Details
+                                                            </a>
+                                                        </li>
+                                                        <li>
+                                                            <a class="dropdown-item" href="update_task.php?id=<?php echo $task['task_id']; ?>">
+                                                                <i class="fas fa-edit me-2"></i>Update Progress
+                                                            </a>
+                                                        </li>
+                                                        <li>
+                                                            <a class="dropdown-item" href="#" onclick="addTaskNote(<?php echo $task['task_id']; ?>)">
+                                                                <i class="fas fa-comment me-2"></i>Add Note
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php } ?>
                                 </tbody>
                             </table>
+                            <?php if (empty($tasks)): ?>
+                                <div class="text-center py-4">
+                                    <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted">No tasks assigned yet.</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Project Timeline -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Assigned Projects</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Project Name</th>
+                                        <th>Assigned Date</th>
+                                        <th>Start Date</th>
+                                        <th>End Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    // Fetch projects assigned to the current engineer
+                                    $stmt = $pdo->prepare("
+                                        SELECT 
+                                            p.project_id,
+                                            p.service,
+                                            p.start_date,
+                                            p.end_date,
+                                            p.status,
+                                            pa.assigned_date
+                                        FROM projects p
+                                        JOIN project_assignees pa ON p.project_id = pa.project_id
+                                        WHERE pa.user_id = ?
+                                        ORDER BY p.end_date ASC
+                                    ");
+                                    $stmt->execute([$_SESSION['user_id']]);
+                                    $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                                    foreach ($projects as $project) {
+                                        $projectStatusClass = match($project['status']) {
+                                            'Completed' => 'bg-success',
+                                            'In Progress' => 'bg-primary',
+                                            'Pending' => 'bg-warning',
+                                            default => 'bg-secondary'
+                                        };
+                                        ?>
+                                        <tr>
+                                            <td>
+                                                <h6 class="mb-0"><?php echo htmlspecialchars($project['service']); ?></h6>
+                                            </td>
+                                            <td><?php echo date('M d, Y', strtotime($project['assigned_date'])); ?></td>
+                                            <td><?php echo date('M d, Y', strtotime($project['start_date'])); ?></td>
+                                            <td><?php echo date('M d, Y', strtotime($project['end_date'])); ?></td>
+                                            <td>
+                                                <span class="badge <?php echo $projectStatusClass; ?>">
+                                                    <?php echo $project['status']; ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <a href="project_details.php?id=<?php echo $project['project_id']; ?>" 
+                                                   class="btn btn-sm btn-primary">
+                                                    <i class="fas fa-eye me-1"></i> View
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    <?php } ?>
+                                </tbody>
+                            </table>
+                            <?php if (empty($projects)): ?>
+                                <div class="text-center py-4">
+                                    <i class="fas fa-project-diagram fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted">No projects assigned yet.</p>
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
             </div>
 
-                <!-- Quick Actions and Deadlines -->
+                <!-- Right Sidebar Content -->
             <div class="col-md-4">
                     <div class="card mb-4">
                     <div class="card-header">
+                            <h5 class="card-title mb-0">Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary" onclick="createNewTask()">
+                                    <i class="fas fa-plus me-2"></i>Create New Task
+                                </button>
+                                <button class="btn btn-info" onclick="viewReports()">
+                                    <i class="fas fa-chart-bar me-2"></i>View Reports
+                                </button>
+                                <button class="btn btn-success" onclick="scheduleInspection()">
+                                    <i class="fas fa-clipboard-check me-2"></i>Schedule Inspection
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="card-title mb-0">Upcoming Deadlines</h5>
+                            <span class="badge bg-danger">Next 7 Days</span>
                         </div>
                         <div class="list-group list-group-flush" id="upcomingDeadlines">
                             <!-- Deadlines will be loaded dynamically -->
@@ -161,6 +378,7 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                             <div id="projectProgressList">
                                 <!-- Project progress will be loaded dynamically -->
                             </div>
+                            <canvas id="projectProgressChart" height="200"></canvas>
                         </div>
                     </div>
                 </div>
@@ -304,7 +522,72 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                 });
             });
         }
+
+        // Initialize Charts
+        initializeProjectProgressChart();
+        initializeTimeline();
+        
+        // Load Dashboard Data
+        loadDashboardData();
+
+        // Task filtering
+        const filterButtons = document.querySelectorAll('.btn-group button');
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove active class from all buttons
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                // Add active class to clicked button
+                this.classList.add('active');
+                
+                const status = this.dataset.status;
+                const tasks = document.querySelectorAll('.task-row');
+                
+                tasks.forEach(task => {
+                    if (status === 'all' || task.dataset.status === status) {
+                        task.style.display = '';
+                    } else {
+                        task.style.display = 'none';
+                    }
+                });
+            });
+        });
     });
+
+    function initializeProjectProgressChart() {
+        const ctx = document.getElementById('projectProgressChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Completed', 'In Progress', 'Pending'],
+                datasets: [{
+                    data: [30, 50, 20],
+                    backgroundColor: ['#28a745', '#007bff', '#ffc107']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+
+    function loadDashboardData() {
+        // Fetch and update dashboard data
+        fetch('../api/engineer/dashboard_data.php')
+            .then(response => response.json())
+            .then(data => {
+                updateDashboardStats(data);
+                updateTasksTable(data.tasks);
+                updateDeadlines(data.deadlines);
+                updateProjectProgress(data.projects);
+            })
+            .catch(error => console.error('Error loading dashboard data:', error));
+    }
+
+    function addTaskNote(taskId) {
+        // Implement task note functionality
+        // You can show a modal or redirect to a notes page
+    }
     </script>
 </body>
 </html> 

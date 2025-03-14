@@ -16,24 +16,12 @@ $stmt = $pdo->prepare("
         p.start_date,
         p.end_date,
         p.notes,
+        p.status,
         p.quotation_file,
-        GROUP_CONCAT(DISTINCT CONCAT(u.name, '|', u.role, '|', u.email) SEPARATOR '||') as assigned_personnel,
-        CASE 
-            WHEN p.status = 'completed' THEN 100
-            WHEN p.status = 'ongoing' THEN 
-                CASE 
-                    WHEN CURRENT_DATE > p.end_date THEN 90
-                    WHEN CURRENT_DATE < p.start_date THEN 0
-                    ELSE ROUND(
-                        (DATEDIFF(CURRENT_DATE, p.start_date) * 100.0) / 
-                        NULLIF(DATEDIFF(p.end_date, p.start_date), 0)
-                    )
-                END
-            ELSE 0
-        END as progress
+        GROUP_CONCAT(DISTINCT CONCAT(u.name, '|', u.role, '|', u.email) SEPARATOR '||') as assigned_personnel
     FROM projects p
-    LEFT JOIN project_personnel pp ON p.project_id = pp.project_id
-    LEFT JOIN users u ON pp.user_id = u.user_id
+    LEFT JOIN project_assignees pa ON p.project_id = pa.project_id
+    LEFT JOIN users u ON pa.user_id = u.user_id
     WHERE p.client_id = ?
     GROUP BY p.project_id
     ORDER BY p.start_date DESC
@@ -95,7 +83,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 <th>Service</th>
                                                 <th>Start Date</th>
                                                 <th>End Date</th>
-                                                <th>Progress</th>
+                                                <th>Status</th>
                                                 <th class="text-center">Action</th>
                                             </tr>
                                         </thead>
@@ -120,35 +108,21 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                             <?php echo date('M d, Y', strtotime($project['end_date'])); ?>
                                                         </div>
                                                     </td>
-                                                    <td style="width: 200px;">
+                                                    <td>
                                                         <?php
-                                                        $progress = min(100, max(0, $project['progress']));
-                                                        $progressClass = 'bg-primary';
-                                                        if ($progress == 100) {
-                                                            $progressClass = 'bg-success';
-                                                        } elseif ($progress >= 75) {
-                                                            $progressClass = 'bg-info';
-                                                        } elseif ($progress >= 50) {
-                                                            $progressClass = 'bg-primary';
-                                                        } elseif ($progress >= 25) {
-                                                            $progressClass = 'bg-warning';
-                                                        } else {
-                                                            $progressClass = 'bg-danger';
-                                                        }
+                                                        $statusClass = match($project['status']) {
+                                                            'completed' => 'bg-success',
+                                                            'ongoing' => 'bg-primary',
+                                                            'pending' => 'bg-warning',
+                                                            default => 'bg-secondary'
+                                                        };
                                                         ?>
-                                                        <div class="progress" style="height: 10px;">
-                                                            <div class="progress-bar <?php echo $progressClass; ?>" 
-                                                                 role="progressbar" 
-                                                                 style="width: <?php echo $progress; ?>%"
-                                                                 aria-valuenow="<?php echo $progress; ?>" 
-                                                                 aria-valuemin="0" 
-                                                                 aria-valuemax="100">
-                                                            </div>
-                                                        </div>
-                                                        <small class="text-muted"><?php echo round($progress); ?>% Complete</small>
+                                                        <span class="badge <?php echo $statusClass; ?>">
+                                                            <?php echo ucfirst($project['status']); ?>
+                                                        </span>
                                                     </td>
                                                     <td class="text-center">
-                                                        <button type="button" class="btn btn-info btn-sm" onclick='viewProjectDetails(<?php echo json_encode($project); ?>)'>
+                                                        <button type="button" class="btn btn-info btn-sm view-project" data-project-id="<?php echo $project['project_id']; ?>">
                                                             <i class="fas fa-eye"></i> View
                                                         </button>
                                                     </td>
@@ -183,11 +157,8 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <p><strong>Service:</strong> <span id="modalService"></span></p>
                                     <p><strong>Start Date:</strong> <span id="modalStartDate"></span></p>
                                     <p><strong>End Date:</strong> <span id="modalEndDate"></span></p>
-                                    <p><strong>Progress:</strong></p>
-                                    <div class="progress mb-2" style="height: 10px;">
-                                        <div class="progress-bar" id="modalProgressBar" role="progressbar"></div>
-                                    </div>
-                                    <p><strong>Notes:</strong></p>
+                                    <p><strong>Status:</strong> <span id="modalStatus"></span></p>
+                                    <p class="mt-3"><strong>Notes:</strong></p>
                                     <p id="modalNotes" class="text-muted"></p>
                                 </div>
                             </div>
@@ -197,9 +168,33 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="col-md-6">
                             <div class="card h-100">
                                 <div class="card-body">
-                                    <h6 class="card-title mb-3">Assigned Personnel</h6>
+                                    <h6 class="card-title mb-3">Project Team</h6>
                                     <div id="modalPersonnel">
                                         <!-- Personnel will be dynamically added here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Project Tasks -->
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-3">Project Tasks</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover" id="modalTasks">
+                                            <thead>
+                                                <tr>
+                                                    <th>Task Name</th>
+                                                    <th>Assigned To</th>
+                                                    <th>Due Date</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <!-- Tasks will be dynamically added here -->
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
@@ -226,79 +221,116 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 
     <script>
-    let projectDetailsModal;
-
     document.addEventListener('DOMContentLoaded', function() {
-        projectDetailsModal = new bootstrap.Modal(document.getElementById('projectDetailsModal'));
-    });
+        const projectDetailsModal = new bootstrap.Modal(document.getElementById('projectDetailsModal'));
 
-    function viewProjectDetails(project) {
-        // Update project information
-        document.getElementById('modalService').textContent = project.service;
-        document.getElementById('modalStartDate').textContent = new Date(project.start_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        document.getElementById('modalEndDate').textContent = new Date(project.end_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        
-        // Update progress bar
-        const progressBar = document.getElementById('modalProgressBar');
-        const progress = Math.min(100, Math.max(0, project.progress));
-        progressBar.style.width = progress + '%';
-        progressBar.setAttribute('aria-valuenow', progress);
-        
-        // Set progress bar color
-        let progressClass = 'bg-primary';
-        if (progress == 100) progressClass = 'bg-success';
-        else if (progress >= 75) progressClass = 'bg-info';
-        else if (progress >= 50) progressClass = 'bg-primary';
-        else if (progress >= 25) progressClass = 'bg-warning';
-        else progressClass = 'bg-danger';
-        
-        progressBar.className = 'progress-bar ' + progressClass;
-        progressBar.textContent = Math.round(progress) + '%';
-
-        // Update notes
-        document.getElementById('modalNotes').textContent = project.notes || 'No notes available';
-
-        // Update personnel
-        const personnelContainer = document.getElementById('modalPersonnel');
-        personnelContainer.innerHTML = '';
-        
-        if (project.assigned_personnel) {
-            const personnel = project.assigned_personnel.split('||');
-            personnel.forEach(person => {
-                const [name, role, email] = person.split('|');
-                const personDiv = document.createElement('div');
-                personDiv.className = 'mb-3 p-2 border rounded';
-                personDiv.innerHTML = `
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-user-circle fa-2x text-muted me-2"></i>
-                        <div>
-                            <div class="fw-bold">${name}</div>
-                            <div class="text-muted small">${role}</div>
-                            <div class="text-muted small">${email}</div>
-                        </div>
-                    </div>
-                `;
-                personnelContainer.appendChild(personDiv);
+        // Add click event listeners to view buttons
+        document.querySelectorAll('.view-project').forEach(button => {
+            button.addEventListener('click', function() {
+                const projectId = this.getAttribute('data-project-id');
+                fetchProjectDetails(projectId);
             });
-        } else {
-            personnelContainer.innerHTML = '<p class="text-muted">No personnel assigned</p>';
+        });
+
+        function fetchProjectDetails(projectId) {
+            console.log('Fetching project:', projectId); // Debug log
+
+            fetch(`get_project_details.php?project_id=${projectId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    console.log('Raw response:', text); // Debug log
+                    return JSON.parse(text);
+                })
+                .then(data => {
+                    console.log('Parsed data:', data); // Debug log
+                    
+                    // Update modal content
+                    document.getElementById('modalService').textContent = data.project.service;
+                    document.getElementById('modalStartDate').textContent = new Date(data.project.start_date)
+                        .toLocaleDateString();
+                    document.getElementById('modalEndDate').textContent = new Date(data.project.end_date)
+                        .toLocaleDateString();
+                    
+                    // Update status badge
+                    const statusBadge = `<span class="badge ${getStatusClass(data.project.status)}">
+                        ${data.project.status.charAt(0).toUpperCase() + data.project.status.slice(1)}
+                    </span>`;
+                    document.getElementById('modalStatus').innerHTML = statusBadge;
+                    
+                    // Update notes
+                    document.getElementById('modalNotes').textContent = data.project.notes || 'No notes available';
+
+                    // Update personnel list
+                    let personnelHtml = '';
+                    if (data.personnel && data.personnel.length > 0) {
+                        data.personnel.forEach(person => {
+                            personnelHtml += `
+                                <div class="mb-3 p-2 border rounded">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-user-circle fa-2x text-muted me-2"></i>
+                                        <div>
+                                            <div class="fw-bold">${person.name}</div>
+                                            <div class="text-muted small">${person.role}</div>
+                                            <div class="text-muted small">${person.email}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        personnelHtml = '<p class="text-muted">No personnel assigned</p>';
+                    }
+                    document.getElementById('modalPersonnel').innerHTML = personnelHtml;
+
+                    // Update tasks table
+                    let tasksHtml = '';
+                    if (data.tasks && data.tasks.length > 0) {
+                        data.tasks.forEach(task => {
+                            tasksHtml += `
+                                <tr>
+                                    <td>${task.task_name}</td>
+                                    <td>${task.assigned_to || 'Unassigned'}</td>
+                                    <td>${new Date(task.due_date).toLocaleDateString()}</td>
+                                    <td>
+                                        <span class="badge ${getStatusClass(task.status)}">
+                                            ${task.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                    } else {
+                        tasksHtml = `
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No tasks found</td>
+                            </tr>
+                        `;
+                    }
+                    document.querySelector('#modalTasks tbody').innerHTML = tasksHtml;
+
+                    // Show the modal
+                    const modal = new bootstrap.Modal(document.getElementById('projectDetailsModal'));
+                    modal.show();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error loading project details. Please try again.');
+                });
         }
 
-        // Update quotation file
-        const quotationContainer = document.getElementById('modalQuotation');
-        if (project.quotation_file) {
-            quotationContainer.innerHTML = `
-                <a href="../uploads/quotations/${project.quotation_file}" class="btn btn-primary" target="_blank">
-                    <i class="fas fa-file-pdf me-2"></i>View Quotation
-                </a>
-            `;
-        } else {
-            quotationContainer.innerHTML = '<p class="text-muted">No quotation file available</p>';
+        function getStatusClass(status) {
+            return {
+                'completed': 'bg-success',
+                'ongoing': 'bg-primary',
+                'pending': 'bg-warning'
+            }[status.toLowerCase()] || 'bg-secondary';
         }
-
-        // Show the modal
-        projectDetailsModal.show();
-    }
+    });
     </script>
 </body>
 </html> 

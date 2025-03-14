@@ -576,13 +576,29 @@ body {
 }
 
 .card-icon {
-    width: 50px;
-    height: 50px;
+    width: 48px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: rgba(255,255,255,0.2);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.card-icon i {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.card h2 {
+    font-size: 2rem;
+    font-weight: 600;
+}
+
+.card-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 /* Sidebar Toggle Button */
@@ -1108,17 +1124,16 @@ body {
     bottom: 0;
     width: 220px;
     background: #235347;
-    transition: all 0.3s ease;
     z-index: 1000;
     overflow-y: auto;
 }
 
 .engineer-main-content {
-    margin-left: 280px;
+    position: relative;
+    margin-left: 220px;
     margin-top: 60px;
     padding: 20px;
-    width: calc(100% - 280px);
-    transition: all 0.3s ease;
+    width: calc(100% - 220px);
 }
 
 .sidebar-menu {
@@ -1145,40 +1160,6 @@ body {
     width: 24px;
     margin-right: 0.75rem;
     font-size: 1rem;
-}
-
-.engineer-sidebar.collapsed {
-    width: 0;
-    overflow: hidden;
-}
-
-.engineer-main-content.expanded {
-    margin-left: 0;
-    width: 100%;
-}
-
-@media (max-width: 768px) {
-    .engineer-sidebar {
-        width: 280px;
-        transform: translateX(-100%);
-    }
-
-    .engineer-sidebar.collapsed {
-        transform: translateX(-100%);
-    }
-
-    .engineer-sidebar:not(.collapsed) {
-        transform: translateX(0);
-    }
-
-    .engineer-main-content {
-        margin-left: 0;
-        width: 100%;
-    }
-
-    .engineer-main-content.expanded {
-        margin-left: 0;
-    }
 }
 
 /* Mobile Header */
@@ -1220,4 +1201,29 @@ body {
     .mobile-header {
         display: flex;
     }
+}
+
+/* Dashboard Card Styles */
+.border-left-primary {
+    border-left: 4px solid #4e73df !important;
+}
+
+.border-left-success {
+    border-left: 4px solid #1cc88a !important;
+}
+
+.border-left-warning {
+    border-left: 4px solid #f6c23e !important;
+}
+
+.text-xs {
+    font-size: .7rem;
+}
+
+.text-gray-300 {
+    color: #dddfeb !important;
+}
+
+.text-gray-800 {
+    color: #5a5c69 !important;
 }

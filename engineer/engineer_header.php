@@ -50,17 +50,25 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'engineer') {
             <i class="fas fa-tachometer-alt"></i>
             Dashboard
         </a>
-        <a href="tasks.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'tasks.php' ? 'active' : ''; ?>">
-            <i class="fas fa-tasks"></i>
-            My Tasks
-        </a>
         <a href="projects.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'projects.php' ? 'active' : ''; ?>">
             <i class="fas fa-project-diagram"></i>
             Projects
         </a>
+        <a href="tasks.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'tasks.php' ? 'active' : ''; ?>">
+            <i class="fas fa-tasks"></i>
+            Tasks
+        </a>
+        <a href="notifications.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'notifications.php' ? 'active' : ''; ?>">
+            <i class="fas fa-bell"></i>
+            Notifications
+        </a>
         <a href="profile.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : ''; ?>">
             <i class="fas fa-user"></i>
             Profile
+        </a>
+        <a href="settings.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active' : ''; ?>">
+            <i class="fas fa-cog"></i>
+            Settings
         </a>
         <a href="../logout.php">
             <i class="fas fa-sign-out-alt"></i>

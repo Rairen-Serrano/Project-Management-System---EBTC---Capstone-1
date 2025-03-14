@@ -26,8 +26,8 @@ $stmt = $pdo->prepare("
         GROUP_CONCAT(DISTINCT CONCAT(up.name, '|', up.role, '|', up.email) SEPARATOR '||') as assigned_personnel
     FROM projects p
     JOIN users u ON p.client_id = u.user_id
-    LEFT JOIN project_personnel pp ON p.project_id = pp.project_id
-    LEFT JOIN users up ON pp.user_id = up.user_id
+    LEFT JOIN project_assignees pa ON p.project_id = pa.project_id
+    LEFT JOIN users up ON pa.user_id = up.user_id
     WHERE p.project_id = ?
     GROUP BY p.project_id
 ");
@@ -60,30 +60,6 @@ if (!$project) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../js/script.js"></script>
 
-    <style>
-    .timeline {
-        position: relative;
-        padding: 20px 0;
-    }
-    .timeline-item {
-        position: relative;
-        padding-left: 40px;
-        margin-bottom: 30px;
-    }
-    .timeline-marker {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 15px;
-        height: 15px;
-        border-radius: 50%;
-    }
-    .timeline-content {
-        padding: 15px;
-        background: #f8f9fa;
-        border-radius: 4px;
-    }
-    </style>
 </head>
 <body>
     <div class="manager-dashboard-wrapper">
@@ -96,7 +72,7 @@ if (!$project) {
                     <h3 class="mb-1">Task Management</h3>
                     <p class="text-muted mb-0">
                         Project: <?php echo htmlspecialchars($project['service']); ?>
-                        <span class="mx-2">|</span>
+                        <br>
                         Client: <?php echo htmlspecialchars($project['client_name']); ?>
                     </p>
                 </div>
@@ -189,21 +165,7 @@ if (!$project) {
                         </div>
                     </div>
                 </div>
-
-                <!-- Task Timeline -->
-                <div class="col-md-12">
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="card-title mb-3">
-                                <i class="fas fa-calendar-alt me-2"></i>Timeline
-                            </h6>
-                            <div class="timeline" id="taskTimeline">
-                                <!-- Timeline will be loaded dynamically -->
-                            </div>
-                        </div>
                     </div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -211,8 +173,10 @@ if (!$project) {
     <div class="modal fade" id="addCategoryModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add Task Category</h5>
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title">
+                        <i class="fas fa-folder-plus me-2"></i>Add Category
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -227,9 +191,9 @@ if (!$project) {
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="saveCategory()">Save Category</button>
+                    <button type="button" class="btn btn-primary" id="saveCategoryBtn">Save Category</button>
                 </div>
             </div>
         </div>
@@ -324,7 +288,7 @@ if (!$project) {
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         <i class="fas fa-times me-2"></i>Cancel
                     </button>
-                    <button type="button" class="btn btn-primary" onclick="saveTask()">
+                    <button type="button" class="btn btn-primary">
                         <i class="fas fa-save me-2"></i>Save Task
                     </button>
                 </div>
@@ -441,7 +405,6 @@ if (!$project) {
         // Load initial data
         loadCategories();
         loadTasks();
-        loadTimeline();
         updateProgress();
         
         // Set minimum date for task due date
@@ -451,14 +414,54 @@ if (!$project) {
             taskDueDate.min = today;
         }
 
+        // Add Category Modal handlers
+        const addCategoryModal = new bootstrap.Modal(document.getElementById('addCategoryModal'));
+        
         // Add Category button click handler
-        const addCategoryBtn = document.getElementById('addCategoryBtn');
-        console.log('Add Category button:', addCategoryBtn);
-        addCategoryBtn.addEventListener('click', function() {
-            console.log('Add Category button clicked');
-            const modal = new bootstrap.Modal(document.getElementById('addCategoryModal'));
+        document.getElementById('addCategoryBtn')?.addEventListener('click', function() {
             document.getElementById('addCategoryForm').reset();
-            modal.show();
+            addCategoryModal.show();
+        });
+
+        // Save Category button click handler
+        document.getElementById('saveCategoryBtn')?.addEventListener('click', async function() {
+            const categoryName = document.getElementById('categoryName').value.trim();
+            const categoryDescription = document.getElementById('categoryDescription').value.trim();
+
+            if (!categoryName) {
+                showAlert('error', 'Category name is required');
+                return;
+            }
+
+            try {
+                const response = await fetch(`api/tasks.php?action=category&project_id=${projectId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        category_name: categoryName,
+                        description: categoryDescription
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to add category');
+                }
+
+                // Close modal and reset form
+                addCategoryModal.hide();
+                document.getElementById('addCategoryForm').reset();
+
+                // Reload categories
+                await loadCategories();
+                showAlert('success', 'Category added successfully');
+            } catch (error) {
+                console.error('Error adding category:', error);
+                showAlert('error', 'Failed to add category');
+            }
         });
 
         // Add Task button click handler
@@ -474,44 +477,81 @@ if (!$project) {
             modal.show();
         });
 
-        // Save Category button click handler
-        const saveCategoryBtn = document.querySelector('#addCategoryModal .btn-primary');
-        console.log('Save Category button:', saveCategoryBtn);
-        saveCategoryBtn.addEventListener('click', function(e) {
-            console.log('Save Category button clicked');
-            e.preventDefault();
-            saveCategory();
-        });
-
-        // Save Task button click handler
-        const saveTaskBtn = document.querySelector('#addTaskModal .btn-primary');
-        console.log('Save Task button:', saveTaskBtn);
-        saveTaskBtn.addEventListener('click', function(e) {
-            console.log('Save Task button clicked');
-            e.preventDefault();
-            saveTask();
-        });
-
         // Show Assignee List button click handler
         const showAssigneeListBtn = document.getElementById('showAssigneeList');
         console.log('Show Assignee List button:', showAssigneeListBtn);
-        showAssigneeListBtn.addEventListener('click', function() {
-            console.log('Show Assignee List button clicked');
-            const container = document.getElementById('assigneeListContainer');
-            
-            if (container.style.display === 'none') {
-                // Load project personnel with current assignees filtered out
-                loadProjectPersonnel(container, false);
-                container.style.display = 'block';
-            } else {
-                container.style.display = 'none';
+        if (showAssigneeListBtn) {
+            showAssigneeListBtn.addEventListener('click', function() {
+                console.log('Show Assignee List button clicked');
+                const container = document.getElementById('assigneeListContainer');
+                
+                if (container.style.display === 'none') {
+                    loadProjectPersonnel(container, false);
+                    container.style.display = 'block';
+                } else {
+                    container.style.display = 'none';
+                }
+            });
+        }
+
+        // Add Task Modal handlers
+        const addTaskModal = new bootstrap.Modal(document.getElementById('addTaskModal'));
+        
+        // Save Task button click handler
+        document.querySelector('#addTaskModal .btn-primary').addEventListener('click', async function() {
+            console.log('Save Task button clicked');
+            const taskName = document.getElementById('taskName').value.trim();
+            const categoryId = document.getElementById('taskCategory').value;
+            const dueDate = document.getElementById('taskDueDate').value;
+            const description = document.getElementById('taskDescription').value.trim();
+            const assignees = JSON.parse(document.getElementById('taskAssignees').value || '[]');
+
+            if (!taskName || !categoryId || !dueDate || assignees.length === 0) {
+                showAlert('error', 'Please fill in all required fields and assign at least one person');
+                return;
+            }
+
+            try {
+                const response = await fetch(`api/tasks.php?action=add_task&project_id=<?php echo $project_id; ?>`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        task_name: taskName,
+                        category_id: categoryId,
+                        description: description,
+                        due_date: dueDate,
+                        assignees: assignees
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to add task');
+                }
+
+                // Close modal and reset form
+                addTaskModal.hide();
+                document.getElementById('addTaskForm').reset();
+                document.getElementById('selectedAssignees').innerHTML = '';
+                document.getElementById('taskAssignees').value = '';
+
+                // Reload tasks and update progress
+                await loadTasks();
+                await updateProgress();
+                showAlert('success', 'Task added successfully');
+            } catch (error) {
+                console.error('Error adding task:', error);
+                showAlert('error', 'Failed to add task');
             }
         });
     });
 
     async function loadCategories() {
         try {
-            const response = await fetch(`api/tasks.php?action=categories&project_id=<?php echo $project_id; ?>`);
+            const response = await fetch(`../api/tasks.php?action=categories&project_id=<?php echo $project_id; ?>`);
             const data = await response.json();
 
             if (!response.ok) {
@@ -522,51 +562,91 @@ if (!$project) {
             const taskCategorySelect = document.getElementById('taskCategory');
 
             // Clear existing categories
-            categoryList.innerHTML = '';
+            if (categoryList) categoryList.innerHTML = '';
             if (taskCategorySelect) {
                 taskCategorySelect.innerHTML = '<option value="">Select Category</option>';
             }
 
             if (!data.categories || data.categories.length === 0) {
-                categoryList.innerHTML = `
-                    <div class="col-12 text-center text-muted py-4">
-                        <i class="fas fa-list fa-2x mb-3"></i>
-                        <p class="mb-0">No categories added yet</p>
-                    </div>
-                `;
+                if (categoryList) {
+                    categoryList.innerHTML = `
+                        <div class="col-12 text-center text-muted py-4">
+                            <i class="fas fa-list fa-2x mb-3"></i>
+                            <p class="mb-0">No categories added yet</p>
+                        </div>
+                    `;
+                }
                 return;
             }
 
+            // Sort categories by created_at in ascending order (oldest first)
+            const sortedCategories = data.categories.sort((a, b) => 
+                new Date(a.created_at) - new Date(b.created_at)
+            );
+
+            let previousCategoryCompleted = true; // First category is always available
+
             // Add categories to the list and dropdown
-            data.categories.forEach(category => {
+            sortedCategories.forEach((category, index) => {
                 // Add to category list
-                const categoryCol = document.createElement('div');
-                categoryCol.className = 'col-md-4 mb-3';
-                categoryCol.innerHTML = `
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <h6 class="card-title mb-2">${escapeHtml(category.category_name)}</h6>
-                            <p class="card-text small text-muted mb-0">${escapeHtml(category.description || 'No description')}</p>
+                if (categoryList) {
+                    const categoryCol = document.createElement('div');
+                    categoryCol.className = 'col-md-4 mb-3';
+                    
+                    const isLocked = !previousCategoryCompleted;
+                    const statusClass = category.status === 'completed' ? 'success' : 
+                                      isLocked ? 'secondary' : 'warning';
+                    const statusText = category.status === 'completed' ? 'Completed' : 
+                                     isLocked ? 'Locked' : 'In Progress';
+
+                    categoryCol.innerHTML = `
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0">${escapeHtml(category.category_name)}</h6>
+                                    <span class="badge bg-${statusClass}">${statusText}</span>
+                                </div>
+                                <p class="card-text text-muted small mb-3">
+                                    ${escapeHtml(category.description || 'No description available')}
+                                </p>
+                                ${isLocked ? `
+                                    <div class="text-muted small">
+                                        <i class="fas fa-lock me-1"></i>Complete previous category to unlock
+                                    </div>
+                                ` : category.status !== 'completed' ? `
+                                    <button class="btn btn-sm btn-success complete-category-btn" 
+                                            onclick="completeCategory(${category.category_id})">
+                                        <i class="fas fa-check me-1"></i>Mark as Complete
+                                    </button>
+                                ` : ''}
+                            </div>
                         </div>
-                    </div>
-                `;
-                categoryList.appendChild(categoryCol);
+                    `;
+                    categoryList.appendChild(categoryCol);
+                }
 
                 // Add to task category dropdown
                 if (taskCategorySelect) {
-                    taskCategorySelect.innerHTML += `
-                        <option value="${category.category_id}">${escapeHtml(category.category_name)}</option>
-                    `;
+                    const option = document.createElement('option');
+                    option.value = category.category_id;
+                    option.textContent = category.category_name;
+                    option.disabled = !previousCategoryCompleted || category.status === 'completed';
+                    taskCategorySelect.appendChild(option);
                 }
+
+                // Update for next iteration
+                previousCategoryCompleted = category.status === 'completed';
             });
         } catch (error) {
             console.error('Error loading categories:', error);
-            document.getElementById('categoryList').innerHTML = `
-                <div class="col-12 text-center text-danger py-4">
-                    <i class="fas fa-exclamation-circle fa-2x mb-3"></i>
-                    <p class="mb-0">Failed to load categories. Please try again.</p>
-                </div>
-            `;
+            if (categoryList) {
+                categoryList.innerHTML = `
+                    <div class="col-12 text-center text-danger py-4">
+                        <i class="fas fa-exclamation-circle fa-2x mb-3"></i>
+                        <p class="mb-0">Failed to load categories. Please try again.</p>
+                    </div>
+                `;
+            }
         }
     }
 
@@ -665,111 +745,6 @@ if (!$project) {
         }
     }
 
-    async function saveCategory() {
-        console.log('saveCategory function called');
-        const categoryName = document.getElementById('categoryName').value.trim();
-        const categoryDescription = document.getElementById('categoryDescription').value.trim();
-
-        if (!categoryName) {
-            showAlert('error', 'Category name is required');
-            return;
-        }
-
-        try {
-            console.log('Sending category data:', { categoryName, categoryDescription });
-            const response = await fetch(`api/tasks.php?action=category&project_id=<?php echo $project_id; ?>`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    category_name: categoryName,
-                    description: categoryDescription
-                })
-            });
-
-            const data = await response.json();
-            console.log('Server response:', data);
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to add category');
-            }
-
-            // Close modal and reset form
-            const modal = bootstrap.Modal.getInstance(document.getElementById('addCategoryModal'));
-            modal.hide();
-            document.getElementById('addCategoryForm').reset();
-
-            // Reload categories and update task category dropdown
-            loadCategories();
-            showAlert('success', 'Category added successfully');
-        } catch (error) {
-            console.error('Error adding category:', error);
-            showAlert('error', 'Failed to add category');
-        }
-    }
-
-    async function saveTask() {
-        console.log('saveTask function called');
-        const taskName = document.getElementById('taskName').value.trim();
-        const categoryId = document.getElementById('taskCategory').value;
-        const dueDate = document.getElementById('taskDueDate').value;
-        const description = document.getElementById('taskDescription').value.trim();
-        const assignees = Array.from(document.querySelectorAll('#selectedAssignees .assignee-item'))
-            .map(item => item.dataset.userId);
-
-        console.log('Task data:', {
-            taskName,
-            categoryId,
-            dueDate,
-            description,
-            assignees
-        });
-
-        if (!taskName || !categoryId || !dueDate || assignees.length === 0) {
-            showAlert('error', 'Please fill in all required fields and select at least one assignee');
-            return;
-        }
-
-        try {
-            const response = await fetch(`api/tasks.php?action=task&project_id=<?php echo $project_id; ?>`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    task_name: taskName,
-                    category_id: categoryId,
-                    due_date: dueDate,
-                    description: description,
-                    assignees: assignees
-                })
-            });
-
-            const data = await response.json();
-            console.log('Server response:', data);
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to add task');
-            }
-
-            // Close modal and reset form
-            const modal = bootstrap.Modal.getInstance(document.getElementById('addTaskModal'));
-            modal.hide();
-            document.getElementById('addTaskForm').reset();
-            document.getElementById('selectedAssignees').innerHTML = '';
-            document.getElementById('assigneeListContainer').style.display = 'none';
-
-            // Reload tasks and update progress
-            loadTasks();
-            updateProgress();
-            showAlert('success', 'Task added successfully');
-        } catch (error) {
-            console.error('Error adding task:', error);
-            showAlert('error', error.message || 'Failed to add task');
-        }
-    }
-
     function showAlert(type, message) {
         const alertContainer = document.createElement('div');
         alertContainer.className = `alert alert-${type === 'error' ? 'danger' : 'success'} alert-dismissible fade show`;
@@ -784,20 +759,19 @@ if (!$project) {
         }, 5000);
     }
 
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric' 
+        });
+    }
+
     function escapeHtml(str) {
-        if (!str) return '';
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
-    }
-
-    function formatDate(dateStr) {
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
     }
 
     function capitalizeFirst(str) {
@@ -805,16 +779,13 @@ if (!$project) {
     }
 
     function getStatusBadgeClass(status) {
-        switch(status.toLowerCase()) {
-            case 'completed':
-                return 'bg-success';
-            case 'in_progress':
-                return 'bg-primary';
-            case 'pending':
-                return 'bg-warning';
-            default:
-                return 'bg-secondary';
-        }
+        const classes = {
+            'completed': 'bg-success',
+            'in_progress': 'bg-primary',
+            'pending': 'bg-warning',
+            'overdue': 'bg-danger'
+        };
+        return classes[status] || 'bg-secondary';
     }
 
     function showModalAssigneeList() {
@@ -832,18 +803,17 @@ if (!$project) {
 
     async function loadProjectPersonnel(container, isModalView = false) {
         try {
-            // Get task ID if in modal view
-            const taskId = isModalView ? document.querySelector('#taskDetailsModal').dataset.taskId : null;
+            console.log('Loading project personnel...');
+            // Log the URL being called
+            const url = `../api/tasks.php?action=project_members&project_id=${projectId}`;
+            console.log('Fetching from URL:', url);
             
-            // Modify the API endpoint to include task_id if in modal view
-            const apiUrl = `api/tasks.php?action=personnel&project_id=<?php echo $project_id; ?>${taskId ? '&task_id=' + taskId : ''}`;
-            console.log('Loading personnel from:', apiUrl);
-            
-            const response = await fetch(apiUrl);
+            const response = await fetch(url);
             const data = await response.json();
+            console.log('Response:', response);
             console.log('Personnel data:', data);
 
-            if (!response.ok) {
+            if (!data.success) {
                 throw new Error(data.error || 'Failed to load personnel');
             }
 
@@ -851,65 +821,41 @@ if (!$project) {
             listGroup.innerHTML = '';
 
             if (!data.personnel || data.personnel.length === 0) {
+                console.log('No personnel found');
                 listGroup.innerHTML = `
                     <div class="list-group-item text-center text-muted">
                         <i class="fas fa-users fa-2x mb-2"></i>
-                        <p class="mb-0">No personnel available</p>
+                        <p class="mb-0">No personnel assigned to this project</p>
                     </div>
                 `;
                 return;
             }
 
-            // Get current assignees
-            const currentAssignees = Array.from(document.querySelectorAll(isModalView ? '#modalTaskAssignees .badge' : '#selectedAssignees .assignee-item'))
-                .map(item => item.dataset.userId);
-            console.log('Current assignees:', currentAssignees);
-
-            // Filter out already assigned personnel when not in modal view
-            const availablePersonnel = isModalView ? data.personnel : 
-                data.personnel.filter(person => !currentAssignees.includes(person.user_id.toString()));
-            console.log('Available personnel:', availablePersonnel);
-
-            if (availablePersonnel.length === 0) {
-                listGroup.innerHTML = `
-                    <div class="list-group-item text-center text-muted">
-                        <i class="fas fa-users fa-2x mb-2"></i>
-                        <p class="mb-0">All available personnel are already assigned</p>
-                    </div>
-                `;
-                return;
-            }
-
-            availablePersonnel.forEach(person => {
-                const isAssigned = currentAssignees.includes(person.user_id.toString());
-                const item = document.createElement('a');
-                item.href = '#';
-                item.className = `list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isAssigned ? 'active' : ''}`;
+            console.log(`Found ${data.personnel.length} personnel`);
+            data.personnel.forEach(person => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'list-group-item list-group-item-action';
                 item.dataset.userId = person.user_id;
                 item.dataset.name = person.name;
+                item.dataset.role = person.role;
+                item.dataset.email = person.email;
+                
                 item.innerHTML = `
-                    <div class="d-flex align-items-center">
-                        <div class="me-3">
-                            <i class="fas fa-user-circle fa-lg text-secondary"></i>
-                        </div>
+                    <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <div class="fw-medium">${escapeHtml(person.name)}</div>
-                            <small class="text-muted">${capitalizeFirst(escapeHtml(person.role))}</small>
+                            <div class="fw-bold">${escapeHtml(person.name)}</div>
+                            <small class="text-muted">${escapeHtml(person.email)}</small>
                         </div>
+                        <span class="badge bg-secondary">${capitalizeFirst(escapeHtml(person.role))}</span>
                     </div>
-                    <i class="fas ${isAssigned ? 'fa-check text-success' : 'fa-plus text-primary'}"></i>
                 `;
-
-                item.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    console.log('Personnel item clicked:', person);
-                    if (isModalView) {
-                        toggleModalAssignee(person.user_id, person.name, this);
-                    } else {
-                        toggleAssignee(person.user_id, person.name, this);
-                    }
+                
+                item.addEventListener('click', function() {
+                    selectAssignee(person);
+                    container.style.display = 'none';
                 });
-
+                
                 listGroup.appendChild(item);
             });
         } catch (error) {
@@ -917,88 +863,44 @@ if (!$project) {
             container.innerHTML = `
                 <div class="list-group-item text-center text-danger">
                     <i class="fas fa-exclamation-circle fa-2x mb-2"></i>
-                    <p class="mb-0">Failed to load personnel</p>
+                    <p class="mb-0">Failed to load personnel. Please try again.</p>
+                    <small class="text-muted">${error.message}</small>
                 </div>
             `;
         }
     }
 
-    async function toggleModalAssignee(userId, name, listItem) {
-        console.log('Toggling modal assignee:', { userId, name });
-        const assigneesContainer = document.getElementById('modalTaskAssignees');
-        const existingAssignee = assigneesContainer.querySelector(`[data-user-id="${userId}"]`);
-        const taskId = document.querySelector('#taskDetailsModal').dataset.taskId;
-        const projectId = <?php echo $project_id; ?>;
-
-        try {
-            if (existingAssignee) {
-                console.log('Removing assignee:', userId);
-                // Remove assignee
-                const response = await fetch(`api/tasks.php?action=remove_assignee&project_id=${projectId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        task_id: taskId,
-                        user_id: userId
-                    })
-                });
-
-                const data = await response.json();
-                console.log('Remove assignee response:', data);
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to remove assignee');
-                }
-
-                existingAssignee.remove();
-                listItem.classList.remove('active');
-                listItem.querySelector('i:last-child').className = 'fas fa-plus text-primary';
-            } else {
-                console.log('Adding assignee:', userId);
-                // Add assignee
-                const response = await fetch(`api/tasks.php?action=add_assignee&project_id=${projectId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        task_id: taskId,
-                        user_id: userId
-                    })
-                });
-
-                const data = await response.json();
-                console.log('Add assignee response:', data);
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to add assignee');
-                }
-
-                const badge = document.createElement('span');
-                badge.className = 'badge bg-light text-dark border';
-                badge.dataset.userId = userId;
-                badge.innerHTML = `
-                    <i class="fas fa-user-circle me-1"></i>
-                    ${escapeHtml(name)}
-                    <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" 
-                            onclick="event.stopPropagation(); toggleModalAssignee('${userId}', '${name}', document.querySelector('#modalAssigneeListContainer [data-user-id=\\'${userId}\\']'))">
-                        <i class="fas fa-times"></i>
-                    </button>
-                `;
-                assigneesContainer.appendChild(badge);
-                listItem.classList.add('active');
-                listItem.querySelector('i:last-child').className = 'fas fa-check text-success';
-            }
-
-            // Reload tasks to reflect changes
-            await loadTasks();
-            showAlert('success', existingAssignee ? 'Personnel removed successfully' : 'Personnel added successfully');
-        } catch (error) {
-            console.error('Error toggling assignee:', error);
-            showAlert('error', error.message || 'Failed to update assignee');
+    function selectAssignee(person) {
+        const selectedAssignees = document.getElementById('selectedAssignees');
+        const existingAssignee = selectedAssignees.querySelector(`[data-user-id="${person.user_id}"]`);
+        
+        if (!existingAssignee) {
+            const assigneeTag = document.createElement('div');
+            assigneeTag.className = 'badge bg-light text-dark assignee-item';
+            assigneeTag.dataset.userId = person.user_id;
+            assigneeTag.innerHTML = `
+                ${escapeHtml(person.name)}
+                <button type="button" class="btn-close btn-close-sm ms-2" 
+                        onclick="removeAssignee(${person.user_id})"></button>
+            `;
+            selectedAssignees.appendChild(assigneeTag);
         }
+        
+        updateAssigneesInput();
+    }
+
+    function removeAssignee(userId) {
+        const assigneeTag = document.querySelector(`.assignee-item[data-user-id="${userId}"]`);
+        if (assigneeTag) {
+            assigneeTag.remove();
+            updateAssigneesInput();
+        }
+    }
+
+    function updateAssigneesInput() {
+        const selectedAssignees = Array.from(document.querySelectorAll('.assignee-item'))
+            .map(item => item.dataset.userId);
+        document.getElementById('taskAssignees').value = JSON.stringify(selectedAssignees);
     }
 
     function viewTaskDetails(taskId) {
@@ -1068,115 +970,6 @@ if (!$project) {
         }
     }
 
-    function toggleAssignee(userId, name, listItem) {
-        console.log('Toggling assignee:', { userId, name });
-        const selectedAssignees = document.getElementById('selectedAssignees');
-        const existingAssignee = selectedAssignees.querySelector(`[data-user-id="${userId}"]`);
-        
-        if (existingAssignee) {
-            // Remove assignee
-            console.log('Removing assignee:', userId);
-            existingAssignee.remove();
-            listItem.classList.remove('active');
-            listItem.querySelector('i:last-child').className = 'fas fa-plus text-primary';
-        } else {
-            // Add assignee
-            console.log('Adding assignee:', userId);
-            const badge = document.createElement('span');
-            badge.className = 'badge bg-light text-dark border assignee-item';
-            badge.dataset.userId = userId;
-            badge.innerHTML = `
-                <i class="fas fa-user-circle me-1"></i>
-                ${escapeHtml(name)}
-                <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" 
-                        onclick="event.stopPropagation(); toggleAssignee('${userId}', '${name}', document.querySelector('#assigneeListContainer [data-user-id=\\'${userId}\\']'))">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
-            selectedAssignees.appendChild(badge);
-            listItem.classList.add('active');
-            listItem.querySelector('i:last-child').className = 'fas fa-check text-success';
-        }
-
-        // Update hidden input with selected assignees
-        const selectedUserIds = Array.from(selectedAssignees.querySelectorAll('.assignee-item'))
-            .map(item => item.dataset.userId);
-        document.getElementById('taskAssignees').value = selectedUserIds.join(',');
-
-        // Refresh the personnel list to show/hide assigned personnel
-        const container = document.getElementById('assigneeListContainer');
-        loadProjectPersonnel(container, false);
-    }
-
-    async function loadTimeline() {
-        try {
-            const response = await fetch(`api/tasks.php?action=timeline&project_id=<?php echo $project_id; ?>`);
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to load timeline');
-            }
-
-            const timelineContainer = document.getElementById('taskTimeline');
-            timelineContainer.innerHTML = '';
-
-            if (!data.timeline || data.timeline.length === 0) {
-                timelineContainer.innerHTML = `
-                    <div class="text-center text-muted py-4">
-                        <i class="fas fa-calendar-alt fa-2x mb-3"></i>
-                        <p class="mb-0">No timeline events yet</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // Sort tasks by due date
-            const sortedTasks = data.timeline.sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
-
-            // Add tasks to timeline
-            sortedTasks.forEach(task => {
-                const daysUntilDue = Math.ceil((new Date(task.due_date) - new Date()) / (1000 * 60 * 60 * 24));
-                const isUrgent = daysUntilDue <= 2 && task.status !== 'completed';
-
-                const timelineItem = document.createElement('div');
-                timelineItem.className = 'timeline-item';
-                timelineItem.innerHTML = `
-                    <div class="timeline-marker bg-${getStatusBadgeClass(task.status).replace('bg-', '')}"></div>
-                    <div class="timeline-content">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="mb-0 ${isUrgent ? 'text-danger' : ''}">${escapeHtml(task.task_name)}</h6>
-                            <span class="badge ${getStatusBadgeClass(task.status)}">
-                                ${capitalizeFirst(task.status.replace('_', ' '))}
-                            </span>
-                        </div>
-                        <p class="text-muted small mb-2">
-                            <i class="fas fa-layer-group me-1"></i>${escapeHtml(task.category_name || 'No Category')}
-                        </p>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">
-                                <i class="fas fa-calendar me-1"></i>${formatDate(task.due_date)}
-                            </small>
-                            <small class="${isUrgent ? 'text-danger' : 'text-muted'}">
-                                ${daysUntilDue === 0 ? 'Due today' : 
-                                  daysUntilDue < 0 ? `${Math.abs(daysUntilDue)} days overdue` :
-                                  `${daysUntilDue} days left`}
-                            </small>
-                        </div>
-                    </div>
-                `;
-                timelineContainer.appendChild(timelineItem);
-            });
-        } catch (error) {
-            console.error('Error loading timeline:', error);
-            document.getElementById('taskTimeline').innerHTML = `
-                <div class="text-center text-danger py-4">
-                    <i class="fas fa-exclamation-circle fa-2x mb-3"></i>
-                    <p class="mb-0">Failed to load timeline. Please try again.</p>
-                </div>
-            `;
-        }
-    }
-
     async function updateProgress() {
         try {
             const response = await fetch(`api/tasks.php?action=progress&project_id=<?php echo $project_id; ?>`);
@@ -1199,6 +992,82 @@ if (!$project) {
             document.getElementById('pendingTasks').textContent = progress.pending_tasks;
         } catch (error) {
             console.error('Error updating progress:', error);
+        }
+    }
+
+    // Add this function to check if previous categories are completed
+    async function checkPreviousCategories(categoryId) {
+        try {
+            const response = await fetch(`api/tasks.php?action=check_previous_categories&project_id=<?php echo $project_id; ?>&category_id=${categoryId}`);
+            const data = await response.json();
+            return data.can_proceed;
+        } catch (error) {
+            console.error('Error checking previous categories:', error);
+            return false;
+        }
+    }
+
+    // Modify the completeCategory function
+    async function completeCategory(categoryId) {
+        if (!confirm('Are you sure you want to mark this category as complete? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`../api/tasks.php?action=complete_category&project_id=<?php echo $project_id; ?>&category_id=${categoryId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to complete category');
+            }
+
+            // Reload categories immediately after successful completion
+            await loadCategories();
+            showAlert('success', 'Category marked as complete');
+        } catch (error) {
+            console.error('Error completing category:', error);
+            showAlert('error', error.message || 'Failed to complete category');
+        }
+    }
+
+    // Modify the task status update function to check category status
+    async function updateTaskStatus(taskId, newStatus) {
+        try {
+            // First check if the task can be updated
+            const checkResponse = await fetch(`api/tasks.php?action=can_update_task&task_id=${taskId}`);
+            const checkData = await checkResponse.json();
+
+            if (!checkData.can_update) {
+                showAlert('error', 'Cannot update task status. Previous category tasks must be completed first.');
+                return;
+            }
+
+            // Proceed with status update if allowed
+            const response = await fetch(`api/tasks.php?action=update_task_status&task_id=${taskId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to update task status');
+            }
+
+            await loadTasks(); // Reload tasks to update UI
+            showAlert('success', 'Task status updated successfully');
+        } catch (error) {
+            console.error('Error updating task status:', error);
+            showAlert('error', 'Failed to update task status');
         }
     }
     </script>

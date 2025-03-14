@@ -54,13 +54,9 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'project_manager') {
             <i class="fas fa-project-diagram"></i>
             Projects
         </a>
-        <a href="team.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'team.php' ? 'active' : ''; ?>">
+        <a href="team_members.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'team_members.php' ? 'active' : ''; ?>">
             <i class="fas fa-users"></i>
             Team Members
-        </a>
-        <a href="reports.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>">
-            <i class="fas fa-chart-bar"></i>
-            Reports
         </a>
         <a href="notifications.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'notifications.php' ? 'active' : ''; ?>">
             <i class="fas fa-bell"></i>

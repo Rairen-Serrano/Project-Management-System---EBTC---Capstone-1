@@ -2,49 +2,42 @@
 session_start();
 require_once '../../dbconnect.php';
 
-// Check if user is logged in
-if (!isset($_SESSION['logged_in']) || !isset($_SESSION['role'])) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized access']);
-    exit;
-}
+header('Content-Type: application/json');
 
-// Check if request is POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed']);
+    echo json_encode(['success' => false, 'message' => 'Invalid request method']);
     exit;
 }
 
-// Get request data
+// Get the PIN from the request body
 $data = json_decode(file_get_contents('php://input'), true);
+$pin = $data['pin'] ?? '';
 
-if (!isset($data['pin']) || strlen($data['pin']) !== 4 || !is_numeric($data['pin'])) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Invalid PIN format']);
+if (empty($pin)) {
+    echo json_encode(['success' => false, 'message' => 'PIN is required']);
     exit;
 }
 
 try {
-    $user_id = $_SESSION['user_id'];
-    $pin = $data['pin'];
-
-    // Get the hashed PIN from database
-    $stmt = $pdo->prepare("SELECT pin_code FROM users WHERE user_id = ?");
-    $stmt->execute([$user_id]);
+    // Get the stored PIN for the current user
+    $stmt = $pdo->prepare("SELECT pin_code FROM users WHERE user_id = ? AND status = 'active'");
+    $stmt->execute([$_SESSION['user_id']]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($user && password_verify($pin, $user['pin_code'])) {
-        // PIN is correct
+    if (!$user) {
+        echo json_encode(['success' => false, 'message' => 'User not found']);
+        exit;
+    }
+
+    // Verify the PIN
+    if (password_verify($pin, $user['pin_code'])) {
         $_SESSION['pin_verified'] = true;
         echo json_encode(['success' => true]);
     } else {
-        // PIN is incorrect
-        http_response_code(401);
-        echo json_encode(['error' => 'Invalid PIN']);
+        echo json_encode(['success' => false, 'message' => 'Invalid PIN']);
     }
-
 } catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
-} 
+    error_log("PIN verification error: " . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Database error']);
+}
+?> 

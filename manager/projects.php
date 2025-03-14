@@ -22,8 +22,8 @@ $query = "
         GROUP_CONCAT(DISTINCT CONCAT(up.name, '|', up.role, '|', up.email) SEPARATOR '||') as assigned_personnel
     FROM projects p
     JOIN users u ON p.client_id = u.user_id
-    LEFT JOIN project_personnel pp ON p.project_id = pp.project_id
-    LEFT JOIN users up ON pp.user_id = up.user_id
+    LEFT JOIN project_assignees pa ON p.project_id = pa.project_id
+    LEFT JOIN users up ON pa.user_id = up.user_id
 ";
 
 $params = [];
@@ -304,6 +304,9 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-success me-2" id="completeProjectBtn" onclick="completeProject()">
+                        <i class="fas fa-check-circle me-2"></i>Mark as Complete
+                    </button>
                     <button type="button" class="btn btn-success me-2" onclick="redirectToTaskManagement()">
                         <i class="fas fa-tasks me-2"></i>Task Management
                     </button>
@@ -826,6 +829,33 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 `;
             }
 
+            // Show/hide complete button and disable other functions based on project status
+            const completeProjectBtn = document.getElementById('completeProjectBtn');
+            const taskManagementBtn = document.querySelector('button[onclick="redirectToTaskManagement()"]');
+            const addPersonnelBtn = document.querySelector('button[onclick="showPersonnelSearch()"]');
+            
+            if (project.status === 'completed') {
+                // Hide complete button
+                completeProjectBtn.style.display = 'none';
+                
+                // Disable and update task management button
+                taskManagementBtn.disabled = true;
+                taskManagementBtn.classList.remove('btn-success');
+                taskManagementBtn.classList.add('btn-secondary');
+                taskManagementBtn.innerHTML = '<i class="fas fa-tasks me-2"></i>Task Management (Project Completed)';
+                
+                // Hide add personnel button
+                addPersonnelBtn.style.display = 'none';
+            } else {
+                // Show/enable all buttons for ongoing projects
+                completeProjectBtn.style.display = 'block';
+                taskManagementBtn.disabled = false;
+                taskManagementBtn.classList.remove('btn-secondary');
+                taskManagementBtn.classList.add('btn-success');
+                taskManagementBtn.innerHTML = '<i class="fas fa-tasks me-2"></i>Task Management';
+                addPersonnelBtn.style.display = 'block';
+            }
+
             // Show the modal
             if (!viewProjectModal) {
                 console.error('View project modal not initialized');
@@ -912,6 +942,15 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             return;
         }
         
+        // Get the current project status from the modal
+        const statusElement = document.getElementById('modalStatus');
+        const currentStatus = statusElement.textContent.trim().toLowerCase();
+        
+        if (currentStatus === 'completed') {
+            alert('Task management is not available for completed projects.');
+            return;
+        }
+        
         // Redirect to the task management page with the project ID
         window.location.href = `task_management.php?project_id=${currentProjectId}`;
     }
@@ -919,6 +958,15 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     let searchTimeout = null;
 
     function showPersonnelSearch() {
+        // Get the current project status from the modal
+        const statusElement = document.getElementById('modalStatus');
+        const currentStatus = statusElement.textContent.trim().toLowerCase();
+        
+        if (currentStatus === 'completed') {
+            alert('Cannot add personnel to completed projects.');
+            return;
+        }
+
         const searchForm = document.getElementById('personnelSearchForm');
         const searchInput = document.getElementById('personnelSearchInput');
         searchForm.style.display = 'block';
@@ -1122,6 +1170,40 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             }
         });
     });
+
+    function completeProject() {
+        if (!currentProjectId) {
+            alert('No project selected');
+            return;
+        }
+
+        if (!confirm('Are you sure you want to mark this project as complete?')) {
+            return;
+        }
+
+        // Create FormData object
+        const formData = new FormData();
+        formData.append('project_id', currentProjectId);
+
+        // Send request to update project status
+        fetch('complete_project.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Project marked as complete successfully!');
+                location.reload();
+            } else {
+                alert(data.message || 'Failed to complete project');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to complete project');
+        });
+    }
     </script>
 </body>
 </html> 

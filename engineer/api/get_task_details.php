@@ -59,11 +59,27 @@ try {
         $picture['url'] = '../' . $picture['url'];
         $picture['uploaded_at'] = date('M j, Y g:i A', strtotime($picture['uploaded_at']));
     }
+
+    // Get team members completion status
+    $stmt = $pdo->prepare("
+        SELECT 
+            u.name,
+            COALESCE(tcs.completed, FALSE) as completed,
+            tcs.completed_at
+        FROM task_assignees ta
+        JOIN users u ON ta.user_id = u.user_id
+        LEFT JOIN task_completion_status tcs ON ta.task_id = tcs.task_id AND ta.user_id = tcs.user_id
+        WHERE ta.task_id = ?
+        ORDER BY u.name ASC
+    ");
+    $stmt->execute([$task_id]);
+    $assignees_status = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode([
         'success' => true,
         'check_in_time' => $check_in ? $check_in['check_in_time'] : null,
-        'pictures' => $pictures
+        'pictures' => $pictures,
+        'assignees_status' => $assignees_status
     ]);
 
 } catch (PDOException $e) {

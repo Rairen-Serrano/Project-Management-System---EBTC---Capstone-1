@@ -2,65 +2,100 @@
 session_start();
 require_once 'dbconnect.php';
 
-// Check if user is already logged in
-if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
-    // Redirect based on role
+// Add this at the beginning of the file, after session_start()
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Clear any existing redirect loop
+if (isset($_SESSION['login_attempts']) && $_SESSION['login_attempts'] > 5) {
+    session_unset();
+    session_destroy();
+    session_start();
+}
+
+// If already logged in, redirect to appropriate dashboard
+if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true && isset($_SESSION['role'])) {
     switch($_SESSION['role']) {
         case 'admin':
             header('Location: admin/dashboard.php');
             break;
-        case 'engineer':
-            header('Location: engineer/dashboard.php');
-            break;
         case 'project_manager':
             header('Location: manager/dashboard.php');
             break;
+        case 'engineer':
+        case 'technician':
         case 'worker':
-            header('Location: worker/dashboard.php');
+            header('Location: engineer/dashboard.php');
             break;
         default:
-            header('Location: index.php');
+            session_unset();
+            session_destroy();
+            session_start();
     }
     exit;
 }
 
+// Debug POST data
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    error_log('POST request received');
+    error_log('POST data: ' . print_r($_POST, true));
+    
     $email = $_POST['email'] ?? '';
     $password = $_POST['password'] ?? '';
+    
+    error_log("Attempting login for email: $email");
     
     try {
         $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND status = 'active' AND role != 'client'");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         
+        error_log("User query executed. Found user: " . ($user ? 'Yes' : 'No'));
+        
+        if ($user) {
+            error_log("User role: " . $user['role']);
+            error_log("Password verification: " . (password_verify($password, $user['password']) ? 'Success' : 'Failed'));
+        }
+        
         if ($user && password_verify($password, $user['password'])) {
+            error_log("Login successful for user: {$user['name']} with role: {$user['role']}");
+            
             $_SESSION['logged_in'] = true;
             $_SESSION['user_id'] = $user['user_id'];
             $_SESSION['name'] = $user['name'];
             $_SESSION['role'] = $user['role'];
             
-            // Redirect based on role
+            error_log("Session data set: " . print_r($_SESSION, true));
+            
             switch($user['role']) {
                 case 'admin':
+                    error_log("Redirecting to admin dashboard");
                     header('Location: admin/dashboard.php');
+                    break;
+                case 'project_manager':
+                    error_log("Redirecting to manager dashboard");
+                    header('Location: manager/dashboard.php');
                     break;
                 case 'engineer':
                     header('Location: engineer/dashboard.php');
                     break;
-                case 'project_manager':
-                    header('Location: manager/dashboard.php');
+                case 'technician':
+                    header('Location: technician/dashboard.php');
                     break;
                 case 'worker':
                     header('Location: worker/dashboard.php');
                     break;
                 default:
+                    error_log("Redirecting to index");
                     header('Location: index.php');
             }
-            exit;
+            exit();
         } else {
+            error_log("Login failed - Invalid credentials");
             $error_message = 'Invalid email or password';
         }
     } catch(PDOException $e) {
+        error_log("Database error: " . $e->getMessage());
         $error_message = 'Login error: ' . $e->getMessage();
     }
 }
@@ -78,8 +113,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <!--Javascript link here-->
     <script defer src="js/script.js"></script>
+    
+    <!-- jQuery (use CDN only) -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-    <script src="js/jquery-3.7.1.js" defer></script>
 
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -111,7 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         <?php endif; ?>
 
-                        <form method="POST" action="">
+                        <form method="POST" action="admin_login.php" id="loginForm">
                             <div class="form-floating mb-4">
                                 <input type="email" class="form-control" id="email" name="email" placeholder="Email" required>
                                 <label for="email"><i class="fas fa-envelope me-2"></i>Email Address</label>
@@ -138,6 +174,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <?php include 'footer.php'; ?>
-    <script src="js/script.js"></script>
+    <script>
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+        console.log('Form submitted');
+    });
+    </script>
 </body>
 </html> 

@@ -86,7 +86,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Tasks | Engineer Dashboard</title>
+    <title>Tasks | Engineer Dashboard</title>
     
     <!-- CSS -->
     <link rel="stylesheet" href="../css/style.css">
@@ -106,31 +106,28 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         <div class="engineer-main-content" <?php echo (!isset($_SESSION['pin_verified']) && !isset($_SESSION['needs_pin_setup'])) ? 'style="display: none;"' : ''; ?>>
             <div class="container-fluid px-4">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h3>My Tasks</h3>
-                    <form method="GET" class="d-flex gap-2">
-                        <select class="form-select" id="statusFilter" name="status" style="width: auto;">
-                            <option value="all" <?php echo $status_filter === 'all' ? 'selected' : ''; ?>>All Status</option>
-                            <option value="pending" <?php echo $status_filter === 'pending' ? 'selected' : ''; ?>>Pending</option>
-                            <option value="in_progress" <?php echo $status_filter === 'in_progress' ? 'selected' : ''; ?>>In Progress</option>
-                            <option value="completed" <?php echo $status_filter === 'completed' ? 'selected' : ''; ?>>Completed</option>
-                        </select>
-                        <select class="form-select" id="projectFilter" name="project_id" style="width: auto;">
-                            <option value="all">All Projects</option>
-                            <?php foreach ($projects as $project): ?>
-                                <option value="<?php echo htmlspecialchars($project['project_id']); ?>" 
-                                        <?php echo $project_filter === (string)$project['project_id'] ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($project['project_name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-filter"></i> Filter
-                        </button>
-                    </form>
-                </div>
-
-                <div class="card">
+                <!-- My Tasks Section -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">My Tasks</h5>
+                        <div class="d-flex gap-2">
+                            <select class="form-select" id="statusFilter" name="status" style="width: auto;">
+                                <option value="all" <?php echo $status_filter === 'all' ? 'selected' : ''; ?>>All Status</option>
+                                <option value="pending" <?php echo $status_filter === 'pending' ? 'selected' : ''; ?>>Pending</option>
+                                <option value="in_progress" <?php echo $status_filter === 'in_progress' ? 'selected' : ''; ?>>In Progress</option>
+                                <option value="completed" <?php echo $status_filter === 'completed' ? 'selected' : ''; ?>>Completed</option>
+                            </select>
+                            <select class="form-select" id="projectFilter" name="project_id" style="width: auto;">
+                                <option value="all">All Projects</option>
+                                <?php foreach ($projects as $project): ?>
+                                    <option value="<?php echo htmlspecialchars($project['project_id']); ?>" 
+                                            <?php echo $project_filter === (string)$project['project_id'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($project['project_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
@@ -217,6 +214,126 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                     </div>
                 </div>
+
+                <!-- Assign New Task Section -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Assign New Task</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="assignTaskForm" class="row g-3">
+                            <!-- Project Selection -->
+                            <div class="col-md-6">
+                                <label for="projectSelect" class="form-label">Project</label>
+                                <select class="form-select" id="projectSelect" required>
+                                    <option value="">Select Project</option>
+                                    <?php
+                                    // Get projects where the engineer is assigned
+                                    try {
+                                        $stmt = $pdo->prepare("
+                                            SELECT DISTINCT 
+                                                p.project_id, 
+                                                p.service as project_name, 
+                                                u.name as client_name
+                                            FROM projects p
+                                            INNER JOIN project_assignees pa ON p.project_id = pa.project_id
+                                            INNER JOIN users u ON p.client_id = u.user_id
+                                            WHERE pa.user_id = :user_id 
+                                            AND p.status != 'completed'
+                                            ORDER BY p.created_at DESC
+                                        ");
+
+                                        $stmt->execute(['user_id' => $_SESSION['user_id']]);
+                                        $assigned_projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                                        
+                                        if (empty($assigned_projects)) {
+                                            echo '<option disabled>No projects assigned</option>';
+                                        } else {
+                                            foreach ($assigned_projects as $project) {
+                                                printf(
+                                                    '<option value="%s">%s (%s)</option>',
+                                                    htmlspecialchars($project['project_id']),
+                                                    htmlspecialchars($project['project_name']),
+                                                    htmlspecialchars($project['client_name'])
+                                                );
+                                            }
+                                        }
+                                    } catch (PDOException $e) {
+                                        error_log("Error in engineer/tasks.php: " . $e->getMessage());
+                                        echo '<option disabled>Error loading projects: ' . htmlspecialchars($e->getMessage()) . '</option>';
+                                    }
+                                    ?>
+                                </select>
+                            </div>
+
+                            <!-- Category Selection -->
+                            <div class="col-md-6">
+                                <label for="categorySelect" class="form-label">Category</label>
+                                <select class="form-select" id="categorySelect" required>
+                                    <option value="">Select Category</option>
+                                    <?php
+                                    $stmt = $pdo->prepare("SELECT category_id, category_name FROM task_categories");
+                                    $stmt->execute();
+                                    while ($category = $stmt->fetch()) {
+                                        echo "<option value='" . htmlspecialchars($category['category_id']) . "'>" . 
+                                             htmlspecialchars($category['category_name']) . "</option>";
+                                    }
+                                    ?>
+                                </select>
+                            </div>
+
+                            <!-- Task Name -->
+                            <div class="col-md-12">
+                                <label for="taskName" class="form-label">Task Name</label>
+                                <input type="text" class="form-control" id="taskName" required>
+                            </div>
+
+                            <!-- Task Description -->
+                            <div class="col-md-12">
+                                <label for="taskDescription" class="form-label">Description</label>
+                                <textarea class="form-control" id="taskDescription" rows="3"></textarea>
+                            </div>
+
+                            <!-- Due Date -->
+                            <div class="col-md-6">
+                                <label for="dueDate" class="form-label">Due Date</label>
+                                <input type="date" class="form-control" id="dueDate" required>
+                            </div>
+
+                            <!-- Assignees -->
+                            <div class="col-md-12">
+                                <label class="form-label">Assignees</label>
+                                <div id="assigneesList">
+                                    <!-- Selected assignees will be displayed here -->
+                                </div>
+                                <button type="button" class="btn btn-outline-primary" id="addAssigneeBtn">
+                                    <i class="fas fa-plus"></i> Add Personnel
+                                </button>
+                            </div>
+
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">Assign Task</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Add Personnel Modal -->
+                <div class="modal fade" id="addPersonnelModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Add Personnel</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="list-group" id="personnelList">
+                                    <!-- Personnel list will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -276,6 +393,15 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="row mb-3">
                                 <div class="col-md-3 text-muted">Check-in:</div>
                                 <div class="col-md-9" id="checkInTime">Not checked in yet</div>
+                            </div>
+                            <!-- Add Team Members Completion Status -->
+                            <div class="row mb-3">
+                                <div class="col-md-3 text-muted">Team Members:</div>
+                                <div class="col-md-9">
+                                    <div id="teamMembersStatus" class="list-group list-group-flush">
+                                        <!-- Team members will be populated here -->
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -378,74 +504,17 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Check if PIN verification is needed
-        const needsPinSetup = <?php echo isset($_SESSION['needs_pin_setup']) ? 'true' : 'false' ?>;
-        const pinVerified = <?php echo isset($_SESSION['pin_verified']) ? 'true' : 'false' ?>;
-        
-        if (needsPinSetup) {
-            const pinSetupModal = new bootstrap.Modal(document.getElementById('pinSetupModal'));
-            pinSetupModal.show();
-            document.querySelector('.engineer-main-content').style.display = 'block';
-        } else if (!pinVerified) {
-            const pinVerificationModal = new bootstrap.Modal(document.getElementById('pinVerificationModal'));
-            pinVerificationModal.show();
-        } else {
-            document.querySelector('.engineer-main-content').style.display = 'block';
-        }
-
-        // Initialize other event listeners and functionality
         initializeTaskPage();
+        initializeAssignTaskForm();
         
-        // Handle PIN verification
-        const verifyPinBtn = document.getElementById('verifyPinBtn');
-        if (verifyPinBtn) {
-            verifyPinBtn.addEventListener('click', function() {
-                const pinInputs = document.querySelectorAll('#pinVerificationModal .pin-input');
-                const pin = Array.from(pinInputs).map(input => input.value).join('');
-                
-                if (pin.length !== 4) {
-                    document.getElementById('pinError').style.display = 'block';
-                    return;
-                }
-                
-                fetch('../api/auth/verify_pin.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ pin })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Hide the modal properly
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('pinVerificationModal'));
-                        modal.hide();
-                        
-                        // Clean up modal artifacts
-                        document.querySelector('.modal-backdrop').remove();
-                        document.body.classList.remove('modal-open');
-                        document.body.style.removeProperty('padding-right');
-                        document.body.style.removeProperty('overflow');
-                        
-                        // Show the main content
-                        document.querySelector('.engineer-main-content').style.display = 'block';
-                        
-                        // Refresh the page to ensure everything is properly loaded
-                        window.location.reload();
-                    } else {
-                        document.getElementById('pinError').style.display = 'block';
-                        pinInputs.forEach(input => input.value = '');
-                        pinInputs[0].focus();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('pinError').textContent = 'An error occurred. Please try again.';
-                    document.getElementById('pinError').style.display = 'block';
-                });
+        // Add click handlers for view buttons
+        document.querySelectorAll('.btn-outline-primary').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const taskId = this.closest('tr').dataset.taskId;
+                viewTaskDetails(taskId, this);
             });
-        }
+        });
     });
 
     function initializeTaskPage() {
@@ -465,14 +534,8 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             });
         }
 
-        // Add click handlers for view buttons
-        document.querySelectorAll('.btn-outline-primary').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault();
-                const taskId = this.closest('tr').dataset.taskId;
-                viewTaskDetails(taskId, this);
-            });
-        });
+        // Initialize task details modal
+        taskDetailsModal = new bootstrap.Modal(document.getElementById('taskDetailsModal'));
 
         // Initialize tooltips
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -488,16 +551,238 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         });
     }
 
+    // Move these to the global scope, before initializeAssignTaskForm
+    let projectMembers = [];
+    let selectedAssignees = new Set();
+
+    // Update the updateAssigneesList function
+    function updateAssigneesList() {
+        const assigneesList = document.getElementById('assigneesList');
+        if (selectedAssignees.size === 0) {
+            assigneesList.innerHTML = '<p class="text-muted mb-0">No personnel assigned</p>';
+            return;
+        }
+
+        assigneesList.innerHTML = Array.from(selectedAssignees).map(userId => {
+            const member = findMemberById(userId);
+            return `
+                <div class="badge bg-primary me-2 mb-2 p-2">
+                    ${member.name}
+                    <button type="button" class="btn-close btn-close-white ms-2" 
+                            data-user-id="${userId}"></button>
+                </div>
+            `;
+        }).join('');
+
+        // Add click event listeners to all remove buttons
+        assigneesList.querySelectorAll('.btn-close').forEach(button => {
+            button.addEventListener('click', function() {
+                const userId = this.getAttribute('data-user-id');
+                removeAssignee(userId);
+            });
+        });
+    }
+
+    function initializeAssignTaskForm() {
+        const projectSelect = document.getElementById('projectSelect');
+        const categorySelect = document.getElementById('categorySelect');
+        const addAssigneeBtn = document.getElementById('addAssigneeBtn');
+        const assignTaskForm = document.getElementById('assignTaskForm');
+        
+        // Initialize the personnel modal
+        const personnelModal = new bootstrap.Modal(document.getElementById('addPersonnelModal'));
+
+        // Handle project selection change
+        projectSelect.addEventListener('change', function() {
+            if (this.value) {
+                // Enable and load categories
+                categorySelect.disabled = false;
+                categorySelect.innerHTML = '<option value="">Loading categories...</option>';
+                
+                fetch(`../api/tasks.php?action=categories&project_id=${this.value}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            categorySelect.innerHTML = '<option value="">Select Category</option>';
+                            
+                            // Sort categories by created_at
+                            const sortedCategories = data.categories.sort((a, b) => {
+                                return new Date(a.created_at) - new Date(b.created_at);
+                            });
+
+                            // Find the first incomplete category
+                            const firstIncompleteIndex = sortedCategories.findIndex(cat => cat.status !== 'completed');
+                            
+                            sortedCategories.forEach((category, index) => {
+                                const option = document.createElement('option');
+                                option.value = category.category_id;
+                                option.textContent = category.category_name;
+                                
+                                // If category is completed, disable it
+                                if (category.status === 'completed') {
+                                    option.disabled = true;
+                                    option.classList.add('text-muted');
+                                    option.textContent += ' (Completed)';
+                                }
+                                // If category is in progress but not the first incomplete one, disable it
+                                else if (index > firstIncompleteIndex) {
+                                    option.disabled = true;
+                                    option.classList.add('text-muted');
+                                    option.textContent += ' (Locked)';
+                                }
+                                
+                                categorySelect.appendChild(option);
+                            });
+                        }
+                    })
+                    .catch(error => console.error('Error loading categories:', error));
+
+                // Clear existing assignees
+                selectedAssignees.clear();
+                updateAssigneesList();
+            } else {
+                categorySelect.disabled = true;
+                categorySelect.innerHTML = '<option value="">Select Project First</option>';
+            }
+        });
+
+        // Handle add assignee button click
+        addAssigneeBtn.addEventListener('click', function() {
+            const projectId = projectSelect.value;
+            if (!projectId) {
+                alert('Please select a project first');
+                return;
+            }
+
+            fetch(`../api/tasks.php?action=project_members&project_id=${projectId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update the global projectMembers array
+                        projectMembers = data.members;
+                        const personnelList = document.getElementById('personnelList');
+                        personnelList.innerHTML = '';
+
+                        projectMembers.forEach(member => {
+                            const isSelected = selectedAssignees.has(member.user_id);
+                            const item = document.createElement('a');
+                            item.href = '#';
+                            item.className = `list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isSelected ? 'active' : ''}`;
+                            item.innerHTML = `
+                                <div>
+                                    <strong>${member.name}</strong>
+                                    <small class="d-block text-muted">${member.role}</small>
+                                </div>
+                                <i class="fas ${isSelected ? 'fa-check-circle' : 'fa-plus-circle'}"></i>
+                            `;
+
+                            item.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                if (isSelected) {
+                                    selectedAssignees.delete(member.user_id);
+                                } else {
+                                    selectedAssignees.add(member.user_id);
+                                }
+                                updateAssigneesList();
+                                personnelModal.hide();
+                            });
+
+                            personnelList.appendChild(item);
+                        });
+
+                        personnelModal.show();
+                    }
+                })
+                .catch(error => console.error('Error loading project members:', error));
+        });
+
+        // Handle form submission
+        assignTaskForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            if (selectedAssignees.size === 0) {
+                alert('Please assign at least one person to the task');
+                return;
+            }
+
+            const formData = {
+                project_id: document.getElementById('projectSelect').value,
+                category_id: document.getElementById('categorySelect').value,
+                task_name: document.getElementById('taskName').value,
+                description: document.getElementById('taskDescription').value,
+                due_date: document.getElementById('dueDate').value,
+                assignees: Array.from(selectedAssignees)
+            };
+
+            // Debug: Log the data being sent
+            console.log('Form Data:', formData);
+
+            fetch('api/tasks.php?action=create_task', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Debug: Log the server response
+                console.log('Server Response:', data);
+                
+                if (data.success) {
+                    alert('Task assigned successfully!');
+                    assignTaskForm.reset();
+                    selectedAssignees.clear();
+                    updateAssigneesList();
+                    window.location.reload();
+                } else {
+                    throw new Error(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error assigning task: ' + error.message);
+            });
+        });
+    }
+
+    // Update the removeAssignee function
+    function removeAssignee(userId) {
+        selectedAssignees.delete(userId);
+        updateAssigneesList();
+    }
+
+    // Update the findMemberById function to handle cases where member is not found
+    function findMemberById(userId) {
+        const member = projectMembers.find(m => m.user_id === userId);
+        return member || { user_id: userId, name: 'Unknown Member' };
+    }
+
     function handleCheckIn() {
         const modal = document.getElementById('taskDetailsModal');
+        if (!modal) {
+            console.error('Task details modal not found');
+            return;
+        }
+
         const taskId = modal.dataset.taskId;
+        if (!taskId) {
+            console.error('Task ID not found');
+            return;
+        }
+
         const button = document.getElementById('checkInBtn');
+        if (!button) {
+            console.error('Check-in button not found');
+            return;
+        }
         
         // Disable button to prevent double clicks
         button.disabled = true;
         button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Checking in...';
         
-        fetch('api/check_in.php', {
+        // Fix the API endpoint path by adding ../
+        fetch('/engineer/api/check_in.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -525,7 +810,10 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     minute: '2-digit',
                     hour12: true
                 });
-                document.getElementById('checkInTime').textContent = checkInTime;
+                const checkInTimeElement = document.getElementById('checkInTime');
+                if (checkInTimeElement) {
+                    checkInTimeElement.textContent = checkInTime;
+                }
                 showAlert('success', 'Successfully checked in!');
                 
                 // Update button state
@@ -679,11 +967,23 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                document.getElementById('completeTaskBtn').disabled = true;
-                document.getElementById('taskStatus').innerHTML = '<span class="badge bg-success">Completed</span>';
-                showAlert('success', 'Task marked as complete!');
-                // Refresh the task list
-                location.reload();
+                // Update the team members status display
+                if (data.assignees_status) {
+                    updateTeamMembersStatus(data.assignees_status);
+                }
+                
+                // If all team members have completed, update the task status
+                if (data.all_completed) {
+                    document.getElementById('completeTaskBtn').disabled = true;
+                    document.getElementById('taskStatus').innerHTML = '<span class="badge bg-success">Completed</span>';
+                }
+                
+                showAlert('success', data.message);
+                
+                // Refresh the task list if the task is fully completed
+                if (data.all_completed) {
+                    location.reload();
+                }
             } else {
                 showAlert('error', data.message || 'Failed to complete task');
             }
@@ -693,19 +993,30 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         });
     }
 
-    function showAlert(type, message) {
-        const alertContainer = document.getElementById('alertContainer');
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type === 'error' ? 'danger' : 'success'} alert-dismissible fade show`;
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        alertContainer.appendChild(alertDiv);
+    function updateTeamMembersStatus(assignees) {
+        const container = document.getElementById('teamMembersStatus');
+        container.innerHTML = '';
         
-        setTimeout(() => {
-            alertDiv.remove();
-        }, 5000);
+        assignees.forEach(member => {
+            const item = document.createElement('div');
+            item.className = 'list-group-item d-flex justify-content-between align-items-center border-0 px-0 py-2';
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = member.name;
+            
+            const statusBadge = document.createElement('span');
+            statusBadge.className = `badge ${member.completed ? 'bg-success' : 'bg-warning'}`;
+            statusBadge.textContent = member.completed ? 'Completed' : 'Pending';
+            
+            if (member.completed && member.completed_at) {
+                const completedTime = new Date(member.completed_at).toLocaleString();
+                statusBadge.title = `Completed at: ${completedTime}`;
+            }
+            
+            item.appendChild(nameSpan);
+            item.appendChild(statusBadge);
+            container.appendChild(item);
+        });
     }
 
     function viewTaskDetails(taskId, button) {
@@ -745,7 +1056,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         document.getElementById('checkInTime').textContent = 'Not checked in yet';
         document.getElementById('workPictures').innerHTML = 'No pictures uploaded yet';
         
-        // Fetch existing check-in time and pictures
+        // Fetch task details including team members status
         fetch(`api/get_task_details.php?task_id=${taskId}`)
             .then(response => response.json())
             .then(data => {
@@ -756,6 +1067,9 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     }
                     if (data.pictures && data.pictures.length > 0) {
                         updatePicturesList(data.pictures);
+                    }
+                    if (data.assignees_status) {
+                        updateTeamMembersStatus(data.assignees_status);
                     }
                 }
             })
@@ -793,6 +1107,26 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             default:
                 return 'bg-secondary';
         }
+    }
+
+    // Add this helper function if it doesn't exist
+    function showAlert(type, message) {
+        const alertContainer = document.getElementById('alertContainer');
+        if (!alertContainer) return;
+
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        
+        alertContainer.appendChild(alertDiv);
+
+        // Remove the alert after 5 seconds
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
     }
     </script>
 
@@ -905,6 +1239,13 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             white-space: nowrap;
             margin-right: 0.5rem;
         }
+    }
+
+    /* Add these styles */
+    #categorySelect option:disabled {
+        color: #6c757d;
+        font-style: italic;
+        background-color: #e9ecef;
     }
     </style>
 </body>

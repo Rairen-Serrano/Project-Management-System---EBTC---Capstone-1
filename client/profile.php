@@ -21,7 +21,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
             throw new Exception('Please enter a valid 4-digit PIN code');
         }
 
-        if ($_POST['pin_code'] !== $user['pin_code']) {
+        // Get the hashed PIN from database
+        $stmt = $pdo->prepare("SELECT pin_code FROM users WHERE user_id = ?");
+        $stmt->execute([$_SESSION['user_id']]);
+        $userData = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // Verify the PIN using password_verify
+        if (!password_verify($_POST['pin_code'], $userData['pin_code'])) {
             throw new Exception('Invalid PIN code');
         }
 

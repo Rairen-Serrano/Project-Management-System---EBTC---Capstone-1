@@ -65,8 +65,64 @@ try {
         ]);
     }
 
-    // Send notifications
-    notifyTaskAssignment($pdo, $task_id, $_SESSION['user_id']);
+    // Send notifications directly without curl
+    try {
+        // Get project details
+        $project_stmt = $pdo->prepare("SELECT service FROM projects WHERE project_id = ?");
+        $project_stmt->execute([$data['project_id']]);
+        $project = $project_stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$project) {
+            throw new Exception('Project not found');
+        }
+
+        // Get assigner's name
+        $assigner_stmt = $pdo->prepare("SELECT name, user_id FROM users WHERE user_id = ?");
+        $assigner_stmt->execute([$_SESSION['user_id']]);
+        $assigner = $assigner_stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$assigner) {
+            throw new Exception('Assigner information not found');
+        }
+
+        // Prepare notification statement
+        $notification_stmt = $pdo->prepare("
+            INSERT INTO notifications (
+                user_id,         -- sender
+                recipient_id,    -- receiver
+                type, 
+                reference_id,    -- task_id
+                title, 
+                message, 
+                is_read, 
+                created_at
+            ) VALUES (?, ?, 'task', ?, ?, ?, FALSE, NOW())
+        ");
+
+        $title = "New Task Assignment";
+        $message = "You have been assigned to task '{$data['task_name']}' in project '{$project['service']}' by {$assigner['name']}.";
+
+        // Send notification to each assignee
+        foreach ($data['assignees'] as $assignee_id) {
+            // Skip if the assignee is the task creator
+            if ($assignee_id == $_SESSION['user_id']) {
+                continue;
+            }
+            
+            error_log("Sending notification to assignee: " . $assignee_id);
+            
+            $notification_stmt->execute([
+                $_SESSION['user_id'],  // sender
+                $assignee_id,          // receiver
+                $task_id,              // reference_id
+                $title,
+                $message
+            ]);
+        }
+    } catch (Exception $e) {
+        error_log("Error sending notifications: " . $e->getMessage());
+        // Continue with task creation even if notifications fail
+    }
 
     $pdo->commit();
 

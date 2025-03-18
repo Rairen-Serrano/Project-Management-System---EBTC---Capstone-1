@@ -10,7 +10,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
 
 // Mark notification as read
 if (isset($_POST['mark_read']) && isset($_POST['notification_id'])) {
-    $stmt = $pdo->prepare("UPDATE notifications SET is_read = TRUE WHERE notification_id = ? AND user_id = ?");
+    $stmt = $pdo->prepare("UPDATE notifications SET is_read = TRUE WHERE notification_id = ? AND recipient_id = ?");
     $stmt->execute([$_POST['notification_id'], $_SESSION['user_id']]);
     header('Location: notifications.php');
     exit;
@@ -18,13 +18,28 @@ if (isset($_POST['mark_read']) && isset($_POST['notification_id'])) {
 
 // Mark all notifications as read
 if (isset($_POST['mark_all_read'])) {
-    $stmt = $pdo->prepare("UPDATE notifications SET is_read = TRUE WHERE user_id = ?");
+    $stmt = $pdo->prepare("UPDATE notifications SET is_read = TRUE WHERE recipient_id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     header('Location: notifications.php');
     exit;
 }
 
-// Get notifications for the current user
+// Pagination settings
+$notifications_per_page = 5;
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$offset = ($page - 1) * $notifications_per_page;
+
+// Get total number of notifications
+$count_stmt = $pdo->prepare("
+    SELECT COUNT(*) 
+    FROM notifications 
+    WHERE recipient_id = ?
+");
+$count_stmt->execute([$_SESSION['user_id']]);
+$total_notifications = $count_stmt->fetchColumn();
+$total_pages = ceil($total_notifications / $notifications_per_page);
+
+// Get notifications for the current page
 $stmt = $pdo->prepare("
     SELECT 
         n.*,
@@ -36,11 +51,19 @@ $stmt = $pdo->prepare("
     FROM notifications n
     LEFT JOIN tasks t ON n.type = 'task' AND n.reference_id = t.task_id
     LEFT JOIN projects p ON n.type = 'project' AND n.reference_id = p.project_id
-    WHERE n.user_id = ?
+    WHERE n.recipient_id = ?
     ORDER BY n.created_at DESC
-");
+    LIMIT " . $notifications_per_page . " OFFSET " . $offset
+);
+
+// Execute with just the user_id
 $stmt->execute([$_SESSION['user_id']]);
 $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Debug information
+echo "<!-- Total notifications: " . $total_notifications . " -->";
+echo "<!-- Total pages: " . $total_pages . " -->";
+echo "<!-- Current page: " . $page . " -->";
 ?>
 
 <!DOCTYPE html>
@@ -83,6 +106,14 @@ $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .notification-time {
             font-size: 0.8rem;
             color: #6c757d;
+        }
+        .pagination {
+            margin-top: 20px;
+        }
+        .page-link.active {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+            color: white;
         }
     </style>
 </head>
@@ -151,6 +182,37 @@ $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                             <?php endforeach; ?>
                         </div>
+
+                        <!-- Pagination -->
+                        <?php if ($total_pages > 1): ?>
+                            <div class="d-flex justify-content-center p-3">
+                                <nav aria-label="Notifications pagination">
+                                    <ul class="pagination mb-0">
+                                        <?php if ($page > 1): ?>
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page=<?php echo ($page - 1); ?>" aria-label="Previous">
+                                                    <span aria-hidden="true">&laquo;</span>
+                                                </a>
+                                            </li>
+                                        <?php endif; ?>
+
+                                        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                                            <li class="page-item <?php echo $i === $page ? 'active' : ''; ?>">
+                                                <a class="page-link" href="?page=<?php echo $i; ?>"><?php echo $i; ?></a>
+                                            </li>
+                                        <?php endfor; ?>
+
+                                        <?php if ($page < $total_pages): ?>
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page=<?php echo ($page + 1); ?>" aria-label="Next">
+                                                    <span aria-hidden="true">&raquo;</span>
+                                                </a>
+                                            </li>
+                                        <?php endif; ?>
+                                    </ul>
+                                </nav>
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>

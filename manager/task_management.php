@@ -397,10 +397,16 @@ if (!$project) {
     </div>
 
     <script>
+    // At the top of your script, declare projectId as a global variable
+    let projectId;
+
     document.addEventListener('DOMContentLoaded', function() {
+        // Initialize projectId from PHP
+        projectId = <?php echo $project_id; ?>;
+        console.log('Project ID:', projectId); // Debug log
+
         console.log('DOMContentLoaded event fired');
         // Initialize variables
-        const projectId = <?php echo $project_id; ?>;
         
         // Load initial data
         loadCategories();
@@ -464,17 +470,17 @@ if (!$project) {
             }
         });
 
+        // Add Task Modal handlers
+        const addTaskModal = new bootstrap.Modal(document.getElementById('addTaskModal'));
+        
         // Add Task button click handler
-        const addTaskBtn = document.getElementById('addTaskBtn');
-        console.log('Add Task button:', addTaskBtn);
-        addTaskBtn.addEventListener('click', function() {
+        document.getElementById('addTaskBtn').addEventListener('click', function() {
             console.log('Add Task button clicked');
-            const modal = new bootstrap.Modal(document.getElementById('addTaskModal'));
             document.getElementById('addTaskForm').reset();
             document.getElementById('selectedAssignees').innerHTML = '';
             document.getElementById('assigneeListContainer').style.display = 'none';
             document.getElementById('taskAssignees').value = '';
-            modal.show();
+            addTaskModal.show();
         });
 
         // Show Assignee List button click handler
@@ -486,7 +492,7 @@ if (!$project) {
                 const container = document.getElementById('assigneeListContainer');
                 
                 if (container.style.display === 'none') {
-                    loadProjectPersonnel(container, false);
+                    loadProjectPersonnel(container);
                     container.style.display = 'block';
                 } else {
                     container.style.display = 'none';
@@ -494,9 +500,6 @@ if (!$project) {
             });
         }
 
-        // Add Task Modal handlers
-        const addTaskModal = new bootstrap.Modal(document.getElementById('addTaskModal'));
-        
         // Save Task button click handler
         document.querySelector('#addTaskModal .btn-primary').addEventListener('click', async function() {
             console.log('Save Task button clicked');
@@ -512,7 +515,8 @@ if (!$project) {
             }
 
             try {
-                const response = await fetch(`api/tasks.php?action=add_task&project_id=<?php echo $project_id; ?>`, {
+                // First create the task
+                const response = await fetch(`../api/tasks.php?action=add_task&project_id=${projectId}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -527,12 +531,36 @@ if (!$project) {
                 });
 
                 const data = await response.json();
+                console.log('Task creation response:', data);
 
-                if (!response.ok) {
+                if (!data.success) {
                     throw new Error(data.error || 'Failed to add task');
                 }
 
+                // Then send notifications
+                console.log('Sending notifications for task:', data.task_id);
+                const notifyResponse = await fetch(`../api/tasks.php?action=notify_task_assignment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        task_id: data.task_id,
+                        task_name: taskName,
+                        project_id: projectId,
+                        assignees: assignees
+                    })
+                });
+
+                const notifyData = await notifyResponse.json();
+                console.log('Notification response:', notifyData);
+
+                if (!notifyData.success) {
+                    console.error('Failed to send notifications:', notifyData.error);
+                }
+
                 // Close modal and reset form
+                const addTaskModal = bootstrap.Modal.getInstance(document.getElementById('addTaskModal'));
                 addTaskModal.hide();
                 document.getElementById('addTaskForm').reset();
                 document.getElementById('selectedAssignees').innerHTML = '';
@@ -541,17 +569,109 @@ if (!$project) {
                 // Reload tasks and update progress
                 await loadTasks();
                 await updateProgress();
-                showAlert('success', 'Task added successfully');
+                showAlert('success', 'Task added successfully and notifications sent');
             } catch (error) {
-                console.error('Error adding task:', error);
-                showAlert('error', 'Failed to add task');
+                console.error('Error in task creation process:', error);
+                showAlert('error', error.message || 'Failed to add task');
             }
         });
+
+        // Function to load project personnel
+        async function loadProjectPersonnel(container) {
+            try {
+                console.log('Loading project personnel for project:', projectId);
+                const response = await fetch(`../api/tasks.php?action=project_members&project_id=${projectId}`);
+                const data = await response.json();
+                console.log('Personnel data:', data);
+
+                const listGroup = container.querySelector('.list-group') || container;
+                listGroup.innerHTML = '';
+
+                if (!data.personnel || data.personnel.length === 0) {
+                    listGroup.innerHTML = `
+                        <div class="list-group-item text-center text-muted">
+                            <i class="fas fa-users fa-2x mb-2"></i>
+                            <p class="mb-0">No personnel assigned to this project</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                data.personnel.forEach(person => {
+                    const item = document.createElement('a');
+                    item.href = '#';
+                    item.className = 'list-group-item list-group-item-action';
+                    item.dataset.userId = person.user_id;
+                    item.dataset.userName = person.name;
+                    item.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-user me-2"></i>
+                                ${escapeHtml(person.name)}
+                            </div>
+                            <small class="text-muted">${escapeHtml(person.role)}</small>
+                        </div>
+                    `;
+
+                    item.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        selectAssignee(person.user_id, person.name);
+                        container.style.display = 'none';
+                    });
+
+                    listGroup.appendChild(item);
+                });
+            } catch (error) {
+                console.error('Error loading personnel:', error);
+                container.innerHTML = `
+                    <div class="alert alert-danger">
+                        Failed to load personnel. Please try again.
+                        <small class="d-block mt-1">${error.message}</small>
+                    </div>
+                `;
+            }
+        }
+
+        // Function to select an assignee
+        function selectAssignee(userId, userName) {
+            const selectedAssignees = document.getElementById('selectedAssignees');
+            const existingAssignee = selectedAssignees.querySelector(`[data-user-id="${userId}"]`);
+            
+            if (!existingAssignee) {
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-primary me-2 mb-2';
+                badge.dataset.userId = userId;
+                badge.innerHTML = `
+                    ${escapeHtml(userName)}
+                    <button type="button" class="btn-close btn-close-white ms-2" 
+                            onclick="removeAssignee(${userId})"></button>
+                `;
+                selectedAssignees.appendChild(badge);
+            }
+            
+            updateAssigneesInput();
+        }
+
+        // Make removeAssignee function available globally
+        window.removeAssignee = function(userId) {
+            const assigneeTag = document.querySelector(`.badge[data-user-id="${userId}"]`);
+            if (assigneeTag) {
+                assigneeTag.remove();
+                updateAssigneesInput();
+            }
+        };
+
+        // Function to update hidden assignees input
+        function updateAssigneesInput() {
+            const selectedAssignees = Array.from(document.querySelectorAll('#selectedAssignees .badge'))
+                .map(badge => badge.dataset.userId);
+            document.getElementById('taskAssignees').value = JSON.stringify(selectedAssignees);
+        }
     });
 
     async function loadCategories() {
         try {
-            const response = await fetch(`../api/tasks.php?action=categories&project_id=<?php echo $project_id; ?>`);
+            const response = await fetch(`../api/tasks.php?action=categories&project_id=${projectId}`);
             const data = await response.json();
 
             if (!response.ok) {
@@ -652,7 +772,7 @@ if (!$project) {
 
     async function loadTasks() {
         try {
-            const response = await fetch(`api/tasks.php?action=tasks&project_id=<?php echo $project_id; ?>`);
+            const response = await fetch(`api/tasks.php?action=tasks&project_id=${projectId}`);
             const data = await response.json();
 
             if (!response.ok) {
@@ -746,16 +866,19 @@ if (!$project) {
     }
 
     function showAlert(type, message) {
-        const alertContainer = document.createElement('div');
-        alertContainer.className = `alert alert-${type === 'error' ? 'danger' : 'success'} alert-dismissible fade show`;
-        alertContainer.innerHTML = `
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type === 'error' ? 'danger' : 'success'} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
             ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         `;
-        document.querySelector('.manager-main-content').insertAdjacentElement('afterbegin', alertContainer);
+        
+        const container = document.querySelector('.container-fluid');
+        container.insertBefore(alertDiv, container.firstChild);
 
+        // Auto dismiss after 5 seconds
         setTimeout(() => {
-            alertContainer.remove();
+            alertDiv.remove();
         }, 5000);
     }
 
@@ -786,121 +909,6 @@ if (!$project) {
             'overdue': 'bg-danger'
         };
         return classes[status] || 'bg-secondary';
-    }
-
-    function showModalAssigneeList() {
-        const container = document.getElementById('modalAssigneeListContainer');
-        
-        // Toggle display
-        if (container.style.display === 'none') {
-            // Load project personnel
-            loadProjectPersonnel(container, true);
-            container.style.display = 'block';
-        } else {
-            container.style.display = 'none';
-        }
-    }
-
-    async function loadProjectPersonnel(container, isModalView = false) {
-        try {
-            console.log('Loading project personnel...');
-            // Log the URL being called
-            const url = `../api/tasks.php?action=project_members&project_id=${projectId}`;
-            console.log('Fetching from URL:', url);
-            
-            const response = await fetch(url);
-            const data = await response.json();
-            console.log('Response:', response);
-            console.log('Personnel data:', data);
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to load personnel');
-            }
-
-            const listGroup = container.querySelector('.list-group') || container;
-            listGroup.innerHTML = '';
-
-            if (!data.personnel || data.personnel.length === 0) {
-                console.log('No personnel found');
-                listGroup.innerHTML = `
-                    <div class="list-group-item text-center text-muted">
-                        <i class="fas fa-users fa-2x mb-2"></i>
-                        <p class="mb-0">No personnel assigned to this project</p>
-                    </div>
-                `;
-                return;
-            }
-
-            console.log(`Found ${data.personnel.length} personnel`);
-            data.personnel.forEach(person => {
-                const item = document.createElement('button');
-                item.type = 'button';
-                item.className = 'list-group-item list-group-item-action';
-                item.dataset.userId = person.user_id;
-                item.dataset.name = person.name;
-                item.dataset.role = person.role;
-                item.dataset.email = person.email;
-                
-                item.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="fw-bold">${escapeHtml(person.name)}</div>
-                            <small class="text-muted">${escapeHtml(person.email)}</small>
-                        </div>
-                        <span class="badge bg-secondary">${capitalizeFirst(escapeHtml(person.role))}</span>
-                    </div>
-                `;
-                
-                item.addEventListener('click', function() {
-                    selectAssignee(person);
-                    container.style.display = 'none';
-                });
-                
-                listGroup.appendChild(item);
-            });
-        } catch (error) {
-            console.error('Error loading personnel:', error);
-            container.innerHTML = `
-                <div class="list-group-item text-center text-danger">
-                    <i class="fas fa-exclamation-circle fa-2x mb-2"></i>
-                    <p class="mb-0">Failed to load personnel. Please try again.</p>
-                    <small class="text-muted">${error.message}</small>
-                </div>
-            `;
-        }
-    }
-
-    function selectAssignee(person) {
-        const selectedAssignees = document.getElementById('selectedAssignees');
-        const existingAssignee = selectedAssignees.querySelector(`[data-user-id="${person.user_id}"]`);
-        
-        if (!existingAssignee) {
-            const assigneeTag = document.createElement('div');
-            assigneeTag.className = 'badge bg-light text-dark assignee-item';
-            assigneeTag.dataset.userId = person.user_id;
-            assigneeTag.innerHTML = `
-                ${escapeHtml(person.name)}
-                <button type="button" class="btn-close btn-close-sm ms-2" 
-                        onclick="removeAssignee(${person.user_id})"></button>
-            `;
-            selectedAssignees.appendChild(assigneeTag);
-        }
-        
-        updateAssigneesInput();
-    }
-
-    function removeAssignee(userId) {
-        const assigneeTag = document.querySelector(`.assignee-item[data-user-id="${userId}"]`);
-        if (assigneeTag) {
-            assigneeTag.remove();
-            updateAssigneesInput();
-        }
-    }
-
-    function updateAssigneesInput() {
-        const selectedAssignees = Array.from(document.querySelectorAll('.assignee-item'))
-            .map(item => item.dataset.userId);
-        document.getElementById('taskAssignees').value = JSON.stringify(selectedAssignees);
     }
 
     function viewTaskDetails(taskId) {
@@ -943,36 +951,44 @@ if (!$project) {
         }
     }
 
+    // Function to delete task
     async function deleteTask(taskId) {
-        // Show confirmation dialog
-        if (!confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+        if (!confirm('Are you sure you want to delete this task?')) {
             return;
         }
 
         try {
-            const response = await fetch(`api/tasks.php?action=task&project_id=<?php echo $project_id; ?>&id=${taskId}`, {
-                method: 'DELETE'
+            console.log('Deleting task:', taskId, 'from project:', projectId); // Debug log
+            const response = await fetch(`../api/tasks.php?action=delete_task&project_id=${projectId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    task_id: taskId
+                })
             });
 
             const data = await response.json();
+            console.log('Delete response:', data); // Debug log
 
-            if (!response.ok) {
+            if (!data.success) {
                 throw new Error(data.error || 'Failed to delete task');
             }
 
             // Reload tasks and update progress
-            loadTasks();
-            updateProgress();
+            await loadTasks();
+            await updateProgress();
             showAlert('success', 'Task deleted successfully');
         } catch (error) {
             console.error('Error deleting task:', error);
-            showAlert('error', 'Failed to delete task');
+            showAlert('error', 'Failed to delete task: ' + error.message);
         }
     }
 
     async function updateProgress() {
         try {
-            const response = await fetch(`api/tasks.php?action=progress&project_id=<?php echo $project_id; ?>`);
+            const response = await fetch(`api/tasks.php?action=progress&project_id=${projectId}`);
             const data = await response.json();
 
             if (!response.ok) {
@@ -998,7 +1014,7 @@ if (!$project) {
     // Add this function to check if previous categories are completed
     async function checkPreviousCategories(categoryId) {
         try {
-            const response = await fetch(`api/tasks.php?action=check_previous_categories&project_id=<?php echo $project_id; ?>&category_id=${categoryId}`);
+            const response = await fetch(`api/tasks.php?action=check_previous_categories&project_id=${projectId}&category_id=${categoryId}`);
             const data = await response.json();
             return data.can_proceed;
         } catch (error) {
@@ -1014,7 +1030,7 @@ if (!$project) {
         }
 
         try {
-            const response = await fetch(`../api/tasks.php?action=complete_category&project_id=<?php echo $project_id; ?>&category_id=${categoryId}`, {
+            const response = await fetch(`../api/tasks.php?action=complete_category&project_id=${projectId}&category_id=${categoryId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

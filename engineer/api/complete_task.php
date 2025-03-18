@@ -75,6 +75,66 @@ try {
     ");
     $stmt->execute([$task_id, $user_id]);
 
+    // Get task and project details for notification
+    $stmt = $pdo->prepare("
+        SELECT 
+            t.task_name,
+            p.service as project_name,
+            (SELECT user_id FROM users WHERE role = 'project_manager' LIMIT 1) as project_manager_id,
+            u.name as completer_name
+        FROM tasks t
+        JOIN projects p ON t.project_id = p.project_id
+        JOIN users u ON u.user_id = ?
+        WHERE t.task_id = ?
+    ");
+    $stmt->execute([$user_id, $task_id]);
+    $taskDetails = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // Get all assignees except the current user
+    $stmt = $pdo->prepare("
+        SELECT 
+            ta.user_id,
+            u.name,
+            COALESCE(tcs.completed, FALSE) as completed
+        FROM task_assignees ta
+        JOIN users u ON ta.user_id = u.user_id
+        LEFT JOIN task_completion_status tcs ON ta.task_id = tcs.task_id AND ta.user_id = tcs.user_id
+        WHERE ta.task_id = ? AND ta.user_id != ?
+    ");
+    $stmt->execute([$task_id, $user_id]);
+    $otherAssignees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Send notifications to other assignees who haven't completed their part
+    $notification_stmt = $pdo->prepare("
+        INSERT INTO notifications (
+            user_id,         -- sender
+            recipient_id,    -- receiver
+            type,
+            reference_id,    -- task_id
+            title,
+            message,
+            is_read,
+            created_at
+        ) VALUES (?, ?, 'task_progress', ?, ?, ?, FALSE, NOW())
+    ");
+
+    foreach ($otherAssignees as $assignee) {
+        if (!$assignee['completed']) {
+            $title = "Task Progress Update";
+            $message = "{$taskDetails['completer_name']} has completed their part of the task '{$taskDetails['task_name']}' in project '{$taskDetails['project_name']}'";
+            
+            error_log("Sending notification to assignee: " . $assignee['user_id']);
+            
+            $notification_stmt->execute([
+                $user_id,               // sender (current user)
+                $assignee['user_id'],   // receiver
+                $task_id,               // reference_id
+                $title,
+                $message
+            ]);
+        }
+    }
+
     // Check if all assignees have completed the task
     $stmt = $pdo->prepare("
         SELECT 
@@ -132,6 +192,18 @@ try {
             json_encode(['status' => 'completed', 'final_completion' => true])
         ]);
 
+        // Send notification to project manager
+        $title = "Task Completed";
+        $message = "{$taskDetails['completer_name']} and team have completed the task '{$taskDetails['task_name']}' in project '{$taskDetails['project_name']}'";
+        
+        $notification_stmt->execute([
+            $user_id,                           // sender (current user)
+            $taskDetails['project_manager_id'], // receiver (project manager)
+            $task_id,                          // reference_id
+            $title,
+            $message
+        ]);
+
         $message = 'Task marked as completed successfully';
     } else {
         // Log the individual completion
@@ -158,16 +230,6 @@ try {
         $message = 'Your part has been marked as completed. Waiting for other team members to complete their parts.';
     }
     
-    // Send notifications
-    try {
-        error_log("Attempting to send completion notifications for task ID: " . $task_id);
-        notifyTaskCompletion($pdo, $task_id, $user_id);
-        error_log("Successfully sent completion notifications");
-    } catch (Exception $e) {
-        error_log("Error sending completion notifications: " . $e->getMessage());
-        // Continue with the transaction even if notification fails
-    }
-
     $pdo->commit();
     
     echo json_encode([

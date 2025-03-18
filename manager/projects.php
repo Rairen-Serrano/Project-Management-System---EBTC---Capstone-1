@@ -696,17 +696,47 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         })
         .then(response => response.json())
         .then(data => {
+            console.log('Project creation response:', data); // Debug log
+            
+            if (data.success && data.project_id) {
+                // Send notifications to client and assigned personnel
+                const notificationData = new FormData();
+                notificationData.append('project_id', data.project_id.toString()); // Ensure project_id is a string
+                notificationData.append('personnel', JSON.stringify(selectedPersonnel));
+                notificationData.append('service', currentAppointment.service);
+
+                // Return the fetch promise for chaining
+                return fetch('send_project_notifications.php', {
+                    method: 'POST',
+                    body: notificationData
+                });
+            } else {
+                throw new Error(data.message || 'Project created but project ID not returned');
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Notification response:', data); // Debug log
             if (data.success) {
                 assignPersonnelModal.hide();
-                alert('Project created and personnel assigned successfully!');
+                alert('Project created and notifications sent successfully!');
                 location.reload();
             } else {
-                alert(data.message || 'Failed to create project and assign personnel');
+                console.error('Notification error:', data);
+                alert(data.message || 'Project created but failed to send notifications');
+                location.reload();
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Failed to create project and assign personnel');
+            // Still reload since project was created
+            alert('Project created but notification sending failed: ' + error.message);
+            location.reload();
         });
     }
 
@@ -1206,4 +1236,5 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     </script>
 </body>
+</html> 
 </html> 

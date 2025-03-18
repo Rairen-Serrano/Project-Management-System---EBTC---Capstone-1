@@ -2,7 +2,7 @@
 session_start();
 require_once '../dbconnect.php';
 
-// Check if user is logged in and is an engineer
+// Check if user is logged in and is an engineer   
 if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'engineer') {
     header('Location: ../admin_login.php');
     exit;
@@ -228,7 +228,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <select class="form-select" id="projectSelect" required>
                                     <option value="">Select Project</option>
                                     <?php
-                                    // Get projects where the engineer is assigned
+                                    // Get projects where the Engineer is assigned
                                     try {
                                         $stmt = $pdo->prepare("
                                             SELECT DISTINCT 
@@ -297,7 +297,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <!-- Due Date -->
                             <div class="col-md-6">
                                 <label for="dueDate" class="form-label">Due Date</label>
-                                <input type="date" class="form-control" id="dueDate" required>
+                                <input type="date" class="form-control" id="dueDate" required min="<?php echo date('Y-m-d'); ?>">
                             </div>
 
                             <!-- Assignees -->
@@ -654,56 +654,65 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 return;
             }
 
+            // Update the fetch URL to point to the correct endpoint
             fetch(`../api/tasks.php?action=project_members&project_id=${projectId}`)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success) {
+                    if (data.success && Array.isArray(data.personnel)) {  // Changed from data.members to data.personnel
                         // Update the global projectMembers array
-                        projectMembers = data.members;
+                        projectMembers = data.personnel;  // Changed from data.members to data.personnel
                         const personnelList = document.getElementById('personnelList');
-                        personnelList.innerHTML = '';
+                        
+                        if (personnelList) {
+                            personnelList.innerHTML = '';
 
-                        projectMembers.forEach(member => {
-                            const isSelected = selectedAssignees.has(member.user_id);
-                            const item = document.createElement('a');
-                            item.href = '#';
-                            item.className = `list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isSelected ? 'active' : ''}`;
-                            item.innerHTML = `
-                                <div>
-                                    <strong>${member.name}</strong>
-                                    <small class="d-block text-muted">${member.role}</small>
-                                </div>
-                                <i class="fas ${isSelected ? 'fa-check-circle' : 'fa-plus-circle'}"></i>
-                            `;
+                            if (projectMembers.length === 0) {
+                                personnelList.innerHTML = '<div class="list-group-item text-muted">No personnel assigned to this project</div>';
+                            } else {
+                                projectMembers.forEach(member => {
+                                    const isSelected = selectedAssignees.has(member.user_id);
+                                    const item = document.createElement('a');
+                                    item.href = '#';
+                                    item.className = `list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isSelected ? 'active' : ''}`;
+                                    item.innerHTML = `
+                                        <div>
+                                            <strong>${member.name}</strong>
+                                            <small class="d-block text-muted">${member.role}</small>
+                                        </div>
+                                        <i class="fas ${isSelected ? 'fa-check-circle' : 'fa-plus-circle'}"></i>
+                                    `;
 
-                            item.addEventListener('click', function(e) {
-                                e.preventDefault();
-                                if (isSelected) {
-                                    selectedAssignees.delete(member.user_id);
-                                } else {
-                                    selectedAssignees.add(member.user_id);
-                                }
-                                updateAssigneesList();
-                                personnelModal.hide();
-                            });
+                                    item.addEventListener('click', function(e) {
+                                        e.preventDefault();
+                                        const userId = member.user_id;
+                                        if (isSelected) {
+                                            selectedAssignees.delete(userId);
+                                        } else {
+                                            selectedAssignees.add(userId);
+                                        }
+                                        updateAssigneesList();
+                                        personnelModal.hide();
+                                    });
 
-                            personnelList.appendChild(item);
-                        });
-
-                        personnelModal.show();
+                                    personnelList.appendChild(item);
+                                });
+                            }
+                            
+                            personnelModal.show();
+                        }
+                    } else {
+                        throw new Error('Invalid data format received from server');
                     }
                 })
-                .catch(error => console.error('Error loading project members:', error));
+                .catch(error => {
+                    console.error('Error loading project members:', error);
+                    alert('Error loading project members. Please try again.');
+                });
         });
 
         // Handle form submission
         assignTaskForm.addEventListener('submit', function(e) {
             e.preventDefault();
-
-            if (selectedAssignees.size === 0) {
-                alert('Please assign at least one person to the task');
-                return;
-            }
 
             const formData = {
                 project_id: document.getElementById('projectSelect').value,
@@ -711,24 +720,51 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 task_name: document.getElementById('taskName').value,
                 description: document.getElementById('taskDescription').value,
                 due_date: document.getElementById('dueDate').value,
-                assignees: Array.from(selectedAssignees)
+                assignees: Array.from(selectedAssignees),
+                created_by: <?php echo $_SESSION['user_id']; ?>  // Add creator ID
             };
+
+            // Validate form data
+            if (!formData.project_id) {
+                alert('Please select a project');
+                return;
+            }
+            if (!formData.category_id) {
+                alert('Please select a category');
+                return;
+            }
+            if (!formData.task_name.trim()) {
+                alert('Please enter a task name');
+                return;
+            }
+            if (!formData.due_date) {
+                alert('Please select a due date');
+                return;
+            }
+            if (formData.assignees.length === 0) {
+                alert('Please assign at least one person to the task');
+                return;
+            }
 
             // Debug: Log the data being sent
             console.log('Form Data:', formData);
 
-            fetch('api/tasks.php?action=create_task', {
+            // Send to assign_task.php which will handle both creation and assignment
+            fetch('api/assign_task.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(formData)
             })
-            .then(response => response.json())
+            .then(async response => {
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || 'Server error occurred');
+                }
+                return data;
+            })
             .then(data => {
-                // Debug: Log the server response
-                console.log('Server Response:', data);
-                
                 if (data.success) {
                     alert('Task assigned successfully!');
                     assignTaskForm.reset();
@@ -736,13 +772,33 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     updateAssigneesList();
                     window.location.reload();
                 } else {
-                    throw new Error(data.message);
+                    throw new Error(data.message || 'Failed to assign task');
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error details:', error);
                 alert('Error assigning task: ' + error.message);
             });
+        });
+
+        // Add this new code for date input validation
+        const dueDateInput = document.getElementById('dueDate');
+        
+        // Set minimum date to today
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        dueDateInput.setAttribute('min', todayStr);
+        
+        // Add event listener to validate date selection
+        dueDateInput.addEventListener('change', function() {
+            const selectedDate = new Date(this.value);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Reset time part for accurate date comparison
+            
+            if (selectedDate < today) {
+                alert('Please select a future date');
+                this.value = todayStr;
+            }
         });
     }
 
@@ -759,67 +815,31 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     function handleCheckIn() {
-        const modal = document.getElementById('taskDetailsModal');
-        if (!modal) {
-            console.error('Task details modal not found');
-            return;
-        }
-
-        const taskId = modal.dataset.taskId;
-        if (!taskId) {
-            console.error('Task ID not found');
-            return;
-        }
-
+        const taskId = document.querySelector('#taskDetailsModal').dataset.taskId;
         const button = document.getElementById('checkInBtn');
-        if (!button) {
-            console.error('Check-in button not found');
-            return;
-        }
         
-        // Disable button to prevent double clicks
+        // Disable button to prevent double submission
         button.disabled = true;
         button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Checking in...';
-        
-        // Fix the API endpoint path by adding ../
-        fetch('/engineer/api/check_in.php', {
+
+        // Updated the fetch URL to the correct path
+        fetch('../engineer/api/check_in.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                task_id: taskId,
-                check_in_time: new Date().toLocaleString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                })
+                task_id: taskId
             })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                const checkInTime = new Date().toLocaleString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                });
-                const checkInTimeElement = document.getElementById('checkInTime');
-                if (checkInTimeElement) {
-                    checkInTimeElement.textContent = checkInTime;
-                }
-                showAlert('success', 'Successfully checked in!');
-                
-                // Update button state
+                // Update check-in time display
+                document.getElementById('checkInTime').textContent = data.check_in_time;
+                // Keep button disabled after successful check-in
                 button.innerHTML = '<i class="fas fa-check me-2"></i>Checked In';
-                button.classList.remove('btn-primary');
-                button.classList.add('btn-success');
+                showAlert('success', 'Successfully checked in!');
             } else {
                 // Re-enable button on error
                 button.disabled = false;
@@ -828,10 +848,10 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             }
         })
         .catch(error => {
-            // Re-enable button on error
+            console.error('Check-in error:', error);
             button.disabled = false;
             button.innerHTML = '<i class="fas fa-clock me-2"></i>Check In';
-            showAlert('error', 'Error checking in: ' + error.message);
+            showAlert('error', 'Error checking in. Please try again.');
         });
     }
 

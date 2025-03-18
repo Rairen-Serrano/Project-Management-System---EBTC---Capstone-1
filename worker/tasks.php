@@ -2,7 +2,7 @@
 session_start();
 require_once '../dbconnect.php';
 
-// Check if user is logged in and is an worker
+// Check if user is logged in and is an worker   
 if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'worker') {
     header('Location: ../admin_login.php');
     exit;
@@ -228,7 +228,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <select class="form-select" id="projectSelect" required>
                                     <option value="">Select Project</option>
                                     <?php
-                                    // Get projects where the worker is assigned
+                                    // Get projects where the Worker is assigned
                                     try {
                                         $stmt = $pdo->prepare("
                                             SELECT DISTINCT 
@@ -297,7 +297,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <!-- Due Date -->
                             <div class="col-md-6">
                                 <label for="dueDate" class="form-label">Due Date</label>
-                                <input type="date" class="form-control" id="dueDate" required>
+                                <input type="date" class="form-control" id="dueDate" required min="<?php echo date('Y-m-d'); ?>">
                             </div>
 
                             <!-- Assignees -->
@@ -654,46 +654,60 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 return;
             }
 
+            // Update the fetch URL to point to the correct endpoint
             fetch(`../api/tasks.php?action=project_members&project_id=${projectId}`)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success) {
+                    if (data.success && Array.isArray(data.personnel)) {  // Changed from data.members to data.personnel
                         // Update the global projectMembers array
-                        projectMembers = data.members;
+                        projectMembers = data.personnel;  // Changed from data.members to data.personnel
                         const personnelList = document.getElementById('personnelList');
-                        personnelList.innerHTML = '';
+                        
+                        if (personnelList) {
+                            personnelList.innerHTML = '';
 
-                        projectMembers.forEach(member => {
-                            const isSelected = selectedAssignees.has(member.user_id);
-                            const item = document.createElement('a');
-                            item.href = '#';
-                            item.className = `list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isSelected ? 'active' : ''}`;
-                            item.innerHTML = `
-                                <div>
-                                    <strong>${member.name}</strong>
-                                    <small class="d-block text-muted">${member.role}</small>
-                                </div>
-                                <i class="fas ${isSelected ? 'fa-check-circle' : 'fa-plus-circle'}"></i>
-                            `;
+                            if (projectMembers.length === 0) {
+                                personnelList.innerHTML = '<div class="list-group-item text-muted">No personnel assigned to this project</div>';
+                            } else {
+                                projectMembers.forEach(member => {
+                                    const isSelected = selectedAssignees.has(member.user_id);
+                                    const item = document.createElement('a');
+                                    item.href = '#';
+                                    item.className = `list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isSelected ? 'active' : ''}`;
+                                    item.innerHTML = `
+                                        <div>
+                                            <strong>${member.name}</strong>
+                                            <small class="d-block text-muted">${member.role}</small>
+                                        </div>
+                                        <i class="fas ${isSelected ? 'fa-check-circle' : 'fa-plus-circle'}"></i>
+                                    `;
 
-                            item.addEventListener('click', function(e) {
-                                e.preventDefault();
-                                if (isSelected) {
-                                    selectedAssignees.delete(member.user_id);
-                                } else {
-                                    selectedAssignees.add(member.user_id);
-                                }
-                                updateAssigneesList();
-                                personnelModal.hide();
-                            });
+                                    item.addEventListener('click', function(e) {
+                                        e.preventDefault();
+                                        const userId = member.user_id;
+                                        if (isSelected) {
+                                            selectedAssignees.delete(userId);
+                                        } else {
+                                            selectedAssignees.add(userId);
+                                        }
+                                        updateAssigneesList();
+                                        personnelModal.hide();
+                                    });
 
-                            personnelList.appendChild(item);
-                        });
-
-                        personnelModal.show();
+                                    personnelList.appendChild(item);
+                                });
+                            }
+                            
+                            personnelModal.show();
+                        }
+                    } else {
+                        throw new Error('Invalid data format received from server');
                     }
                 })
-                .catch(error => console.error('Error loading project members:', error));
+                .catch(error => {
+                    console.error('Error loading project members:', error);
+                    alert('Error loading project members. Please try again.');
+                });
         });
 
         // Handle form submission
@@ -765,6 +779,26 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 console.error('Error details:', error);
                 alert('Error assigning task: ' + error.message);
             });
+        });
+
+        // Add this new code for date input validation
+        const dueDateInput = document.getElementById('dueDate');
+        
+        // Set minimum date to today
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        dueDateInput.setAttribute('min', todayStr);
+        
+        // Add event listener to validate date selection
+        dueDateInput.addEventListener('change', function() {
+            const selectedDate = new Date(this.value);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Reset time part for accurate date comparison
+            
+            if (selectedDate < today) {
+                alert('Please select a future date');
+                this.value = todayStr;
+            }
         });
     }
 

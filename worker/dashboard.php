@@ -2,9 +2,11 @@
 session_start();
 require_once '../dbconnect.php';
 
-// Check if user is logged in and is a worker
+// Check if user is logged in and is an worker
 if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'worker') {
-    // Just redirect to login without clearing the session
+    // Clear session and redirect to login
+    session_unset();
+    session_destroy();
     header('Location: ../admin_login.php');
     exit;
 }
@@ -46,21 +48,22 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../js/script.js"></script>
+
 </head>
-<body id="workerDashboardPage" data-needs-pin-setup="<?php echo empty($user['pin_code']) ? 'true' : 'false'; ?>">
-    <div class="worker-dashboard-wrapper">
+<body id="engineerDashboardPage" data-needs-pin-setup="<?php echo empty($user['pin_code']) ? 'true' : 'false'; ?>">
+    <div class="engineer-dashboard-wrapper">
         <!-- Include worker header -->
         <?php include 'worker_header.php'; ?>
 
-        <!-- Main Content -->
-        <div class="worker-main-content" <?php echo !isset($_SESSION['pin_verified']) ? 'style="display: none;"' : ''; ?>>
+    <!-- Main Content -->
+        <div class="engineer-main-content" <?php echo !isset($_SESSION['pin_verified']) ? 'style="display: none;"' : ''; ?>>
             <!-- Welcome Section -->
             <div class="row mb-4">
                 <div class="col-12">
                     <div class="card bg-primary text-white">
                         <div class="card-body">
                             <h4 class="welcome-message">Welcome back, <?php echo htmlspecialchars($_SESSION['name']); ?>!</h4>
-                            <p class="mb-0">Here's your task overview for today</p>
+                            <p class="mb-0">Here's your project overview for today</p>
                         </div>
                     </div>
                 </div>
@@ -69,22 +72,7 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
             <!-- Statistics Cards -->
             <div class="row g-4 mb-4">
                 <div class="col-md-4">
-                    <div class="card bg-primary text-white">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="card-title mb-1">Pending Tasks</h6>
-                                    <h2 class="mb-0" id="pendingTasks">0</h2>
-                                </div>
-                                <div class="card-icon">
-                                    <i class="fas fa-clock fa-2x"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card bg-success text-white">
+                    <div class="card bg-success text-white stats-card">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
@@ -99,12 +87,27 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="card bg-info text-white">
+                    <div class="card bg-warning text-white stats-card">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="card-title mb-1">Projects Assigned</h6>
-                                    <h2 class="mb-0" id="assignedProjects">0</h2>
+                                    <h6 class="card-title mb-1">Pending Tasks</h6>
+                                    <h2 class="mb-0" id="pendingTasks">0</h2>
+                                </div>
+                                <div class="card-icon">
+                                    <i class="fas fa-clock fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-info text-white stats-card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="card-title mb-1">Total Projects</h6>
+                                    <h2 class="mb-0" id="totalProjects">0</h2>
                                 </div>
                                 <div class="card-icon">
                                     <i class="fas fa-project-diagram fa-2x"></i>
@@ -115,102 +118,140 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                 </div>
             </div>
 
-            <!-- Current Tasks Table -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">My Tasks</h5>
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-primary active" data-status="all">All</button>
-                        <button class="btn btn-sm btn-outline-primary" data-status="pending">Pending</button>
-                        <button class="btn btn-sm btn-outline-primary" data-status="completed">Completed</button>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Task</th>
-                                    <th>Project</th>
-                                    <th>Due Date</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php
-                                // Fetch tasks assigned to the current worker
-                                $stmt = $pdo->prepare("
-                                    SELECT 
-                                        t.task_id,
-                                        t.task_name,
-                                        t.description,
-                                        t.due_date,
-                                        t.status,
-                                        p.project_id,
-                                        p.service as project_name,
-                                        ta.assigned_date
-                                    FROM tasks t
-                                    JOIN task_assignees ta ON t.task_id = ta.task_id
-                                    JOIN projects p ON t.project_id = p.project_id
-                                    WHERE ta.user_id = ?
-                                    ORDER BY t.due_date ASC
-                                ");
-                                $stmt->execute([$_SESSION['user_id']]);
-                                $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                                if (empty($tasks)): ?>
-                                    <tr>
-                                        <td colspan="5" class="text-center py-4">
-                                            <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
-                                            <p class="text-muted">No tasks assigned yet.</p>
-                                        </td>
-                                    </tr>
-                                <?php else:
-                                    foreach ($tasks as $task):
-                                        // Determine status class
-                                        $statusClass = match($task['status']) {
-                                            'completed' => 'bg-success',
-                                            'pending' => 'bg-warning',
-                                            default => 'bg-secondary'
-                                        };
-
-                                        // Calculate if task is overdue
-                                        $dueDate = new DateTime($task['due_date']);
-                                        $today = new DateTime();
-                                        $isOverdue = $today > $dueDate && $task['status'] !== 'completed';
-                                ?>
-                                        <tr class="task-row" data-status="<?php echo strtolower($task['status']); ?>">
-                                            <td>
-                                                <div class="d-flex flex-column">
-                                                    <h6 class="mb-1"><?php echo htmlspecialchars($task['task_name']); ?></h6>
-                                                    <small class="text-muted"><?php echo htmlspecialchars(substr($task['description'], 0, 50)) . '...'; ?></small>
-                                                </div>
-                                            </td>
-                                            <td><?php echo htmlspecialchars($task['project_name']); ?></td>
-                                            <td>
-                                                <div class="<?php echo $isOverdue ? 'text-danger' : ''; ?>">
-                                                    <?php echo date('M d, Y', strtotime($task['due_date'])); ?>
-                                                    <?php if ($isOverdue): ?>
-                                                        <span class="badge bg-danger">Overdue</span>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span class="badge <?php echo $statusClass; ?>">
-                                                    <?php echo ucfirst($task['status']); ?>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <button class="btn btn-sm btn-primary" onclick="viewTaskDetails(<?php echo $task['task_id']; ?>)">
-                                                    <i class="fas fa-eye"></i> View
-                                                </button>
-                                            </td>
+            <!-- Main Dashboard Content -->
+            <div class="row">
+                <!-- Make the main content full width -->
+                <div class="col-12">
+                    <!-- Latest Tasks Card -->
+                    <div class="card dashboard-card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">Latest Tasks</h5>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-primary active" data-status="all">All</button>
+                                    <button class="btn btn-sm btn-outline-primary" data-status="in_progress">In Progress</button>
+                                    <button class="btn btn-sm btn-outline-primary" data-status="pending">Pending</button>
+                                    <button class="btn btn-sm btn-outline-primary" data-status="completed">Completed</button>
+                                </div>
+                                <a href="tasks.php" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-list me-1"></i>View All Tasks
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive table-fixed-height">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Task Name</th>
+                                            <th>Project</th>
+                                            <th>Assigned Date</th>
+                                            <th>Due Date</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
                                         </tr>
-                                    <?php endforeach;
-                                endif; ?>
-                            </tbody>
-                        </table>
+                                    </thead>
+                                    <tbody>
+                                        <?php
+                                        // Fetch tasks assigned to the current worker
+                                        $stmt = $pdo->prepare("
+                                            SELECT 
+                                                t.task_id,
+                                                t.task_name,
+                                                t.description,
+                                                t.due_date,
+                                                t.status,
+                                                p.project_id,
+                                                p.service,
+                                                ta.assigned_date
+                                            FROM tasks t
+                                            JOIN task_assignees ta ON t.task_id = ta.task_id
+                                            JOIN projects p ON t.project_id = p.project_id
+                                            WHERE ta.user_id = ?
+                                            ORDER BY ta.assigned_date DESC
+                                            LIMIT 3
+                                        ");
+                                        $stmt->execute([$_SESSION['user_id']]);
+                                        $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                                        foreach ($tasks as $task) {
+                                            // Determine status class
+                                            $statusClass = match($task['status']) {
+                                                'Completed' => 'bg-success',
+                                                'In Progress' => 'bg-primary',
+                                                'Pending' => 'bg-warning',
+                                                default => 'bg-secondary'
+                                            };
+
+                                            // Calculate days remaining
+                                            $dueDate = new DateTime($task['due_date']);
+                                            $today = new DateTime();
+                                            $isOverdue = $today > $dueDate && $task['status'] !== 'Completed';
+                                            ?>
+                                            <tr class="task-row" data-status="<?php echo strtolower(str_replace(' ', '_', $task['status'])); ?>">
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <div>
+                                                            <h6 class="mb-0"><?php echo htmlspecialchars($task['task_name']); ?></h6>
+                                                            <small class="text-muted"><?php echo htmlspecialchars(substr($task['description'], 0, 50)) . '...'; ?></small>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <a href="project_details.php?id=<?php echo $task['project_id']; ?>" class="text-decoration-none">
+                                                        <?php echo htmlspecialchars($task['service']); ?>
+                                                    </a>
+                                                </td>
+                                                <td><?php echo date('M d, Y', strtotime($task['assigned_date'])); ?></td>
+                                                <td>
+                                                    <div class="<?php echo $isOverdue ? 'text-danger' : ''; ?>">
+                                                        <?php echo date('M d, Y', strtotime($task['due_date'])); ?>
+                                                        <?php if ($isOverdue): ?>
+                                                            <span class="badge bg-danger">Overdue</span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span class="badge <?php echo $statusClass; ?>">
+                                                        <?php echo $task['status']; ?>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div class="dropdown">
+                                                        <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
+                                                            <i class="fas fa-ellipsis-v"></i>
+                                                        </button>
+                                                        <ul class="dropdown-menu">
+                                                            <li>
+                                                                <a class="dropdown-item" href="task_details.php?id=<?php echo $task['task_id']; ?>">
+                                                                    <i class="fas fa-eye me-2"></i>View Details
+                                                                </a>
+                                                            </li>
+                                                            <li>
+                                                                <a class="dropdown-item" href="update_task.php?id=<?php echo $task['task_id']; ?>">
+                                                                    <i class="fas fa-edit me-2"></i>Update Progress
+                                                                </a>
+                                                            </li>
+                                                            <li>
+                                                                <a class="dropdown-item" href="#" onclick="addTaskNote(<?php echo $task['task_id']; ?>)">
+                                                                    <i class="fas fa-comment me-2"></i>Add Note
+                                                                </a>
+                                                            </li>
+                                                        </ul>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php } ?>
+                                    </tbody>
+                                </table>
+                                <?php if (empty($tasks)): ?>
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">No tasks assigned yet.</p>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -286,171 +327,182 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
         </div>
     </div>
 
+    <style>
+    /* Update the table height to use more vertical space */
+    .table-fixed-height {
+        max-height: 600px; /* Increased height since we removed Projects */
+        overflow-y: auto;
+    }
+
+    /* Ensure smooth scrolling */
+    .table-fixed-height::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .table-fixed-height::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .table-fixed-height::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    .table-fixed-height::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* Keep headers visible while scrolling */
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background: white;
+        z-index: 1;
+    }
+    </style>
+
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize dashboard functionality
-            loadWorkerDashboardData();
-            
-            // Show PIN modal if needed
-            const needsPinSetup = document.body.dataset.needsPinSetup === 'true';
-            if (needsPinSetup) {
-                const pinSetupModal = new bootstrap.Modal(document.getElementById('pinSetupModal'));
-                pinSetupModal.show();
-                setupPinInputHandlers();
-            } else if (!<?php echo isset($_SESSION['pin_verified']) ? 'true' : 'false'; ?>) {
-                const pinVerificationModal = new bootstrap.Modal(document.getElementById('pinVerificationModal'));
-                pinVerificationModal.show();
-                setupPinInputHandlers();
-            }
-
-            // Task filtering
-            const filterButtons = document.querySelectorAll('.btn-group button');
-            filterButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    filterButtons.forEach(btn => btn.classList.remove('active'));
-                    this.classList.add('active');
-                    filterTasks(this.dataset.status);
-                });
-            });
-
-            loadDashboardStats();
-            // Refresh stats every 5 minutes
-            setInterval(loadDashboardStats, 300000);
-        });
-
-        function loadWorkerDashboardData() {
-            // Implement dashboard data loading
-            fetch('../api/worker/dashboard_data.php')
-                .then(response => response.json())
-                .then(data => {
-                    updateDashboardStats(data);
-                    updateTasksTable(data.tasks);
-                })
-                .catch(error => console.error('Error loading dashboard data:', error));
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize dashboard functionality
+        if (typeof handleEngineerDashboardPage === 'function') {
+            handleEngineerDashboardPage();
         }
 
-        function filterTasks(status) {
-            const rows = document.querySelectorAll('.task-row');
-            rows.forEach(row => {
-                if (status === 'all' || row.dataset.status === status) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
+        // Show PIN modal if needed
+        const needsPinSetup = document.body.dataset.needsPinSetup === 'true';
+        if (needsPinSetup) {
+            const pinSetupModal = new bootstrap.Modal(document.getElementById('pinSetupModal'));
+            pinSetupModal.show();
+        } else if (!<?php echo isset($_SESSION['pin_verified']) ? 'true' : 'false'; ?>) {
+            const pinVerificationModal = new bootstrap.Modal(document.getElementById('pinVerificationModal'));
+            pinVerificationModal.show();
         }
 
-        // Handle PIN input functionality
-        function setupPinInputHandlers() {
-            const pinInputs = document.querySelectorAll('.pin-input');
-            
-            pinInputs.forEach((input, index) => {
-                // Move to next input after entering a digit
-                input.addEventListener('input', function() {
-                    if (this.value.length === 1) {
-                        const nextInput = pinInputs[index + 1];
-                        if (nextInput) nextInput.focus();
-                    }
-                });
-
-                // Handle backspace
-                input.addEventListener('keydown', function(e) {
-                    if (e.key === 'Backspace' && !this.value) {
-                        const prevInput = pinInputs[index - 1];
-                        if (prevInput) {
-                            prevInput.focus();
-                            prevInput.value = '';
-                        }
-                    }
-                });
-            });
-
-            // Setup PIN verification handler
-            const verifyPinBtn = document.getElementById('verifyPinBtn');
-            if (verifyPinBtn) {
-                verifyPinBtn.addEventListener('click', verifyPin);
-            }
-
-            // Setup PIN save handler
-            const savePinBtn = document.getElementById('savePinBtn');
-            if (savePinBtn) {
-                savePinBtn.addEventListener('click', savePin);
-            }
-        }
-
-        function verifyPin() {
-            const pinInputs = document.querySelectorAll('#pinVerificationModal .pin-input');
-            const pin = Array.from(pinInputs).map(input => input.value).join('');
-            
-            fetch('../api/auth/verify_pin.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ pin })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload();
-                } else {
+        // Handle PIN verification
+        const verifyPinBtn = document.getElementById('verifyPinBtn');
+        if (verifyPinBtn) {
+            verifyPinBtn.addEventListener('click', function() {
+                const pinInputs = document.querySelectorAll('#pinVerificationModal .pin-input');
+                const pin = Array.from(pinInputs).map(input => input.value).join('');
+                
+                if (pin.length !== 4) {
                     document.getElementById('pinError').style.display = 'block';
-                    pinInputs.forEach(input => input.value = '');
-                    pinInputs[0].focus();
+                    return;
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('pinError').textContent = 'An error occurred. Please try again.';
-                document.getElementById('pinError').style.display = 'block';
-            });
-        }
-
-        function savePin() {
-            const setupPins = Array.from(document.querySelectorAll('.setup-pin')).map(input => input.value).join('');
-            const confirmPins = Array.from(document.querySelectorAll('.confirm-pin')).map(input => input.value).join('');
-            
-            if (setupPins !== confirmPins) {
-                document.getElementById('pinSetupError').textContent = 'PINs do not match';
-                document.getElementById('pinSetupError').style.display = 'block';
-                return;
-            }
-
-            fetch('../api/auth/setup_pin.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ pin: setupPins })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload();
-                } else {
-                    document.getElementById('pinSetupError').textContent = data.message || 'Failed to set PIN';
-                    document.getElementById('pinSetupError').style.display = 'block';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('pinSetupError').textContent = 'An error occurred. Please try again.';
-                document.getElementById('pinSetupError').style.display = 'block';
-            });
-        }
-
-        function loadDashboardStats() {
-            fetch('api/get_dashboard_stats.php')
+                
+                fetch('../api/auth/verify_pin.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ pin })
+                })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        document.getElementById('pendingTasks').textContent = data.stats.pending_tasks;
-                        document.getElementById('completedTasks').textContent = data.stats.completed_tasks;
-                        document.getElementById('assignedProjects').textContent = data.stats.assigned_projects;
+                        // Hide the modal properly
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('pinVerificationModal'));
+                        modal.hide();
+                        
+                        // Clean up modal artifacts
+                        document.querySelector('.modal-backdrop').remove();
+                        document.body.classList.remove('modal-open');
+                        document.body.style.removeProperty('padding-right');
+                        document.body.style.removeProperty('overflow');
+                        
+                        // Show the main content
+                        document.querySelector('.engineer-main-content').style.display = 'block';
+                        
+                        // Refresh the page to ensure everything is properly loaded
+                        window.location.reload();
+                    } else {
+                        document.getElementById('pinError').style.display = 'block';
+                        pinInputs.forEach(input => input.value = '');
+                        pinInputs[0].focus();
                     }
                 })
-                .catch(error => console.error('Error loading dashboard stats:', error));
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('pinError').textContent = 'An error occurred. Please try again.';
+                    document.getElementById('pinError').style.display = 'block';
+                });
+            });
         }
+
+        // Load Dashboard Data
+        loadDashboardData();
+
+        // Task filtering
+        const filterButtons = document.querySelectorAll('.btn-group button');
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove active class from all buttons
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                // Add active class to clicked button
+                this.classList.add('active');
+                
+                const status = this.dataset.status;
+                const tasks = document.querySelectorAll('.task-row');
+                
+                tasks.forEach(task => {
+                    if (status === 'all' || task.dataset.status === status) {
+                        task.style.display = '';
+                    } else {
+                        task.style.display = 'none';
+                    }
+                });
+            });
+        });
+
+        // Add PIN Input Handling
+        function setupPinInputs(containerSelector) {
+            const container = document.querySelector(containerSelector);
+            if (!container) return;
+
+            const inputs = container.querySelectorAll('.pin-input');
+            
+            inputs.forEach((input, index) => {
+                // Handle keyup for number input and auto-focus
+                input.addEventListener('keyup', function(e) {
+                    // Move to next input if value is entered
+                    if (this.value && index < inputs.length - 1) {
+                        inputs[index + 1].focus();
+                    }
+                    
+                    // Handle backspace to previous input
+                    if (e.key === 'Backspace' && !this.value && index > 0) {
+                        inputs[index - 1].focus();
+                    }
+                });
+            });
+        }
+
+        // Initialize PIN inputs for both verification and setup modals
+        setupPinInputs('#pinVerificationModal .pin-input-group');
+        setupPinInputs('#pinSetupModal .pin-input-group');
+    });
+
+    function loadDashboardData() {
+        // Fetch and update dashboard data
+        fetch('../api/worker/dashboard_data.php')
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    const data = result.data;
+                    // Update statistics (removed activeTasks)
+                    document.getElementById('completedTasks').textContent = data.completed_tasks;
+                    document.getElementById('pendingTasks').textContent = data.pending_tasks;
+                    document.getElementById('totalProjects').textContent = data.total_projects;
+                } else {
+                    console.error('Failed to load dashboard data:', result.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error loading dashboard data:', error);
+            });
+    }
+
     </script>
 </body>
 </html> 

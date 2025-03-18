@@ -63,7 +63,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'client') {
             <i class="fas fa-project-diagram"></i>
             My Projects
         </a>
-        <a href="#" class="<?php echo basename($_SERVER['PHP_SELF']) == '#' ? 'active' : ''; ?>">
+        <a href="notifications.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'notifications.php' ? 'active' : ''; ?>">
             <i class="fas fa-bell"></i>
             Notifications
         </a>

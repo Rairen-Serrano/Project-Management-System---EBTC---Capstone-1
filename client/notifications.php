@@ -10,7 +10,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'client') {
 
 // Mark notification as read
 if (isset($_POST['mark_read']) && isset($_POST['notification_id'])) {
-    $stmt = $pdo->prepare("UPDATE notifications SET is_read = TRUE WHERE notification_id = ? AND user_id = ?");
+    $stmt = $pdo->prepare("UPDATE notifications SET is_read = TRUE WHERE notification_id = ? AND recipient_id = ?");
     $stmt->execute([$_POST['notification_id'], $_SESSION['user_id']]);
     header('Location: notifications.php');
     exit;
@@ -18,13 +18,28 @@ if (isset($_POST['mark_read']) && isset($_POST['notification_id'])) {
 
 // Mark all notifications as read
 if (isset($_POST['mark_all_read'])) {
-    $stmt = $pdo->prepare("UPDATE notifications SET is_read = TRUE WHERE user_id = ?");
+    $stmt = $pdo->prepare("UPDATE notifications SET is_read = TRUE WHERE recipient_id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     header('Location: notifications.php');
     exit;
 }
 
-// Get notifications for the current user
+// Pagination settings
+$notifications_per_page = 5;
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$offset = ($page - 1) * $notifications_per_page;
+
+// Get total number of notifications
+$count_stmt = $pdo->prepare("
+    SELECT COUNT(*) 
+    FROM notifications 
+    WHERE recipient_id = ?
+");
+$count_stmt->execute([$_SESSION['user_id']]);
+$total_notifications = $count_stmt->fetchColumn();
+$total_pages = ceil($total_notifications / $notifications_per_page);
+
+// Get notifications for the current page
 $stmt = $pdo->prepare("
     SELECT 
         n.*,
@@ -36,10 +51,16 @@ $stmt = $pdo->prepare("
     FROM notifications n
     LEFT JOIN tasks t ON n.type = 'task' AND n.reference_id = t.task_id
     LEFT JOIN projects p ON n.type = 'project' AND n.reference_id = p.project_id
-    WHERE n.user_id = ?
+    WHERE n.recipient_id = :recipient_id
     ORDER BY n.created_at DESC
+    LIMIT :limit OFFSET :offset
 ");
-$stmt->execute([$_SESSION['user_id']]);
+
+// Bind parameters properly for LIMIT and OFFSET
+$stmt->bindValue(':recipient_id', $_SESSION['user_id'], PDO::PARAM_INT);
+$stmt->bindValue(':limit', $notifications_per_page, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
 $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
@@ -154,6 +175,28 @@ $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <?php endif; ?>
                 </div>
             </div>
+
+            <!-- Pagination -->
+            <?php if ($total_pages > 1): ?>
+                <div class="pagination-container d-flex justify-content-between align-items-center p-3 border-top">
+                    <div class="pagination-info">
+                        Showing <?php echo $offset + 1; ?> to <?php echo min($offset + $notifications_per_page, $total_notifications); ?> of <?php echo $total_notifications; ?> notifications
+                    </div>
+                    <div class="pagination-buttons">
+                        <?php if ($page > 1): ?>
+                            <a href="?page=<?php echo $page - 1; ?>" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-chevron-left me-1"></i> Previous
+                            </a>
+                        <?php endif; ?>
+                        
+                        <?php if ($page < $total_pages): ?>
+                            <a href="?page=<?php echo $page + 1; ?>" class="btn btn-outline-primary btn-sm">
+                                Next <i class="fas fa-chevron-right ms-1"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 

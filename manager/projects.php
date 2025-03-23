@@ -843,14 +843,32 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             });
         }
 
-        // Show/hide complete button based on status
-        const completeProjectBtn = document.getElementById('completeProjectBtn');
-        if (completeProjectBtn) {
-            completeProjectBtn.style.display = project.status === 'completed' ? 'none' : 'block';
-        }
-
         // Store current project ID
         currentProjectId = project.project_id;
+
+        // Check task categories status
+        fetch(`api/get_task_categories_status.php?project_id=${currentProjectId}`)
+            .then(response => response.json())
+            .then(data => {
+                const completeProjectBtn = document.getElementById('completeProjectBtn');
+                if (completeProjectBtn) {
+                    if (project.status === 'completed') {
+                        completeProjectBtn.style.display = 'none';
+                    } else {
+                        completeProjectBtn.style.display = 'block';
+                        if (data.hasInProgressCategories) {
+                            completeProjectBtn.disabled = true;
+                            completeProjectBtn.title = 'Cannot complete project while task categories are in progress';
+                        } else {
+                            completeProjectBtn.disabled = false;
+                            completeProjectBtn.title = 'Mark project as complete';
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking task categories status:', error);
+            });
 
         // Show the modal
         const viewProjectModal = new bootstrap.Modal(document.getElementById('viewProjectModal'));

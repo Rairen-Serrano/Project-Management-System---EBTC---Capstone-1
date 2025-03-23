@@ -48,12 +48,6 @@ try {
         exit;
     }
 
-    // Check if trying to reschedule to the same date and time
-    if ($_POST['new_date'] === $appointment['date'] && $_POST['new_time'] === $appointment['time']) {
-        echo json_encode(['success' => false, 'message' => 'Please select a different time for rescheduling']);
-        exit;
-    }
-
     // Check if the time slot is already booked by another appointment
     $stmt = $pdo->prepare("
         SELECT COUNT(*) 
@@ -62,8 +56,9 @@ try {
         AND time = ? 
         AND appointment_id != ? 
         AND status != 'cancelled'
+        AND client_id != ?
     ");
-    $stmt->execute([$_POST['new_date'], $_POST['new_time'], $_POST['appointment_id']]);
+    $stmt->execute([$_POST['new_date'], $_POST['new_time'], $_POST['appointment_id'], $_SESSION['user_id']]);
     $exists = $stmt->fetchColumn();
 
     if ($exists > 0) {

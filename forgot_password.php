@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $mail->addAddress($email, $user['name']);
 
                 // Content
-                $reset_link = "http://{$_SERVER['HTTP_HOST']}/reset_password.php?token=" . $token;
+                $reset_link = "https://ebtc-pms.online/reset_password.php?token=" . $token;
                 
                 $mail->isHTML(true);
                 $mail->Subject = "Reset Your EBTC PMS Password";

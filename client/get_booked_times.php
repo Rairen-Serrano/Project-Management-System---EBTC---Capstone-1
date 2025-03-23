@@ -51,10 +51,9 @@ try {
         SELECT TIME_FORMAT(time, '%H:%i') as booked_time 
         FROM appointments 
         WHERE date = ? 
-        AND appointment_id != ? 
         AND status != 'cancelled'
     ");
-    $stmt->execute([$date, $currentAppointmentId]);
+    $stmt->execute([$date]);
     $bookedTimes = $stmt->fetchAll(PDO::FETCH_COLUMN);
     
     error_log("Booked times: " . print_r($bookedTimes, true));

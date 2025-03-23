@@ -188,28 +188,5 @@ if ($token) {
     </div>
 
     <?php include 'footer.php'; ?>
-    <script>
-        // Add password visibility toggle
-        document.addEventListener('DOMContentLoaded', function() {
-            const passwordFields = document.querySelectorAll('input[type="password"]');
-            passwordFields.forEach(field => {
-                // Create and add toggle button
-                const toggleBtn = document.createElement('button');
-                toggleBtn.type = 'button';
-                toggleBtn.className = 'btn btn-link password-toggle';
-                toggleBtn.innerHTML = '<i class="fas fa-eye" style="color: #000000;"></i>';
-                field.parentElement.appendChild(toggleBtn);
-
-                // Add click event
-                toggleBtn.addEventListener('click', function() {
-                    const type = field.getAttribute('type') === 'password' ? 'text' : 'password';
-                    field.setAttribute('type', type);
-                    this.innerHTML = type === 'password' 
-                        ? '<i class="fas fa-eye" style="color: #000000;"></i>' 
-                        : '<i class="fas fa-eye-slash" style="color: #000000;"></i>';
-                });
-            });
-        });
-    </script>
 </body>
 </html> 

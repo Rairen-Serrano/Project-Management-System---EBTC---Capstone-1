@@ -521,27 +521,171 @@ function handleDashboardPage() {
 
     // Add reschedule appointment function to window object
     window.rescheduleAppointment = function(appointmentId) {
+        // Get current appointment date and time from the table row
+        const appointmentRow = document.querySelector(`tr[data-appointment-id="${appointmentId}"]`);
+        
+        // If row not found, use default values
+        let currentDate = '';
+        let currentTime = '';
+        
+        if (appointmentRow) {
+            const dateCell = appointmentRow.querySelector('td:nth-child(2)');
+            const timeCell = appointmentRow.querySelector('td:nth-child(3)');
+            
+            if (dateCell && timeCell) {
+                currentDate = dateCell.textContent.trim();
+                currentTime = timeCell.textContent.trim();
+            }
+        }
+        
+        // Store current appointment details
+        window.currentAppointmentDate = currentDate;
+        window.currentAppointmentTime = currentTime;
+        
+        // Set up the reschedule modal
         document.getElementById('appointmentToReschedule').value = appointmentId;
         document.getElementById('newDate').value = '';
         document.getElementById('newTime').value = '';
-        pinInputs.forEach(input => input.value = '');
+        document.querySelectorAll('#pinVerificationRescheduleModal .pin-input').forEach(input => input.value = '');
+        
+        // Show the reschedule modal
+        const rescheduleModal = new bootstrap.Modal(document.getElementById('rescheduleModal'));
         rescheduleModal.show();
     };
 
+    // Function to update time slots based on selected date
+    async function updateTimeSlots(date, appointmentId) {
+        const timeSelect = document.getElementById('newTime');
+        timeSelect.innerHTML = '<option value="">Select Time</option>';
+
+        try {
+            const response = await fetch('get_booked_times.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    date: date,
+                    appointment_id: appointmentId
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                const bookedTimes = data.bookedTimes || [];
+                const currentTime = data.currentTime;
+                
+                // Generate time slots from 9 AM to 3 PM with 30-minute intervals
+                for (let hour = 9; hour <= 15; hour++) {
+                    for (let minute = 0; minute < 60; minute += 30) {
+                        const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                        const option = document.createElement('option');
+                        option.value = time;
+                        
+                        // Calculate end time
+                        const endHour = minute === 0 ? hour : hour + 1;
+                        const endMinute = minute === 0 ? 30 : 0;
+                        
+                        // Format start time
+                        const displayHour = hour > 12 ? hour - 12 : hour;
+                        const ampm = hour >= 12 ? 'PM' : 'AM';
+                        const startTime = `${displayHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}${ampm}`;
+                        
+                        // Format end time
+                        const displayEndHour = endHour > 12 ? endHour - 12 : endHour;
+                        const endAmpm = endHour >= 12 ? 'PM' : 'AM';
+                        const endTime = `${displayEndHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}${endAmpm}`;
+                        
+                        // Set the display text
+                        option.textContent = `${startTime} - ${endTime}`;
+                        
+                        // Check if time is booked or is the current appointment time
+                        if (bookedTimes.includes(time) || time === currentTime) {
+                            option.disabled = true;
+                            option.classList.add('text-muted');
+                            // Add note for unavailable slots
+                            if (time === currentTime) {
+                                option.textContent += ' (Your current appointment)';
+                            } else {
+                                option.textContent += ' (Already booked)';
+                            }
+                        }
+                        
+                        timeSelect.appendChild(option);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching booked times:', error);
+        }
+    }
+
+    // Add event listener for date change
+    document.getElementById('newDate').addEventListener('change', function() {
+        const date = this.value;
+        const appointmentId = document.getElementById('appointmentToReschedule').value;
+        if (date) {
+            updateTimeSlots(date, appointmentId);
+        }
+    });
+
+    // Handle reschedule confirmation
+    document.getElementById('confirmReschedule').addEventListener('click', async function() {
+        const newDate = document.getElementById('newDate').value;
+        const newTime = document.getElementById('newTime').value;
+        const appointmentId = document.getElementById('appointmentToReschedule').value;
+
+        // Validate that both date and time are selected
+        if (!newDate || !newTime) {
+            alert('Please select both date and time');
+            return;
+        }
+
+        // Check if the new date is in the past
+        const selectedDateTime = new Date(newDate + 'T' + newTime);
+        const now = new Date();
+        if (selectedDateTime <= now) {
+            alert('Please select a future date and time');
+            return;
+        }
+
+        // Show PIN verification modal
+        const pinVerificationModal = new bootstrap.Modal(document.getElementById('pinVerificationRescheduleModal'));
+        pinVerificationModal.show();
+    });
+
     // Handle reschedule confirmation
     document.getElementById('confirmReschedule').addEventListener('click', function() {
-        newDateValue = document.getElementById('newDate').value;
-        newTimeValue = document.getElementById('newTime').value;
-        appointmentIdValue = document.getElementById('appointmentToReschedule').value;
+        const newDateValue = document.getElementById('newDate').value;
+        const newTimeValue = document.getElementById('newTime').value;
+        const appointmentIdValue = document.getElementById('appointmentToReschedule').value;
 
         if (!newDateValue || !newTimeValue) {
             alert('Please select both date and time');
             return;
         }
 
+        // Check if trying to reschedule to the same date and time
+        const newDateTime = new Date(newDateValue + ' ' + newTimeValue);
+        const currentDateTime = new Date(window.currentAppointmentDate + ' ' + window.currentAppointmentTime);
+        
+        if (newDateTime.getTime() === currentDateTime.getTime()) {
+            alert('Please select a different date and time for rescheduling');
+            return;
+        }
+
+        // Check if the new date is in the past
+        const now = new Date();
+        if (newDateTime <= now) {
+            alert('Please select a future date and time');
+            return;
+        }
+
         // Hide reschedule modal and show PIN modal
+        const rescheduleModal = bootstrap.Modal.getInstance(document.getElementById('rescheduleModal'));
         rescheduleModal.hide();
-        document.querySelectorAll('#pinVerificationRescheduleModal .pin-input').forEach(input => input.value = '');
+        const pinRescheduleModal = new bootstrap.Modal(document.getElementById('pinVerificationRescheduleModal'));
         pinRescheduleModal.show();
     });
 
@@ -549,48 +693,45 @@ function handleDashboardPage() {
     document.getElementById('confirmPinReschedule').addEventListener('click', function() {
         const pinInputs = document.querySelectorAll('#pinVerificationRescheduleModal .pin-input');
         const pin = Array.from(pinInputs).map(input => input.value).join('');
+        const appointmentIdValue = document.getElementById('appointmentToReschedule').value;
+        const newDateValue = document.getElementById('newDate').value;
+        const newTimeValue = document.getElementById('newTime').value;
 
         if (pin.length !== 4) {
             alert('Please enter a valid 4-digit PIN');
             return;
         }
 
-        // First verify PIN
-        fetch('verify_pin.php', {
+        // Send both PIN and appointment details to reschedule_appointment.php
+        fetch('reschedule_appointment.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: 'pin=' + pin
+            body: `appointment_id=${appointmentIdValue}&new_date=${newDateValue}&new_time=${newTimeValue}&pin=${pin}`
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // If PIN is correct, proceed with rescheduling
-                return fetch('reschedule_appointment.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `appointment_id=${appointmentIdValue}&new_date=${newDateValue}&new_time=${newTimeValue}`
-                });
-            } else {
-                throw new Error('Incorrect PIN');
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
             }
+            return response.json();
         })
-        .then(response => response.json())
         .then(data => {
             if (data.success) {
+                const pinRescheduleModal = bootstrap.Modal.getInstance(document.getElementById('pinVerificationRescheduleModal'));
                 pinRescheduleModal.hide();
                 location.reload();
             } else {
                 alert(data.message || 'Error rescheduling appointment');
+                pinInputs.forEach(input => input.value = '');
+                pinInputs[0].focus();
             }
         })
         .catch(error => {
-            alert(error.message || 'Error processing request');
-            pinRescheduleModal.hide();
-            rescheduleModal.show(); // Show reschedule modal again if PIN verification fails
+            console.error('Error:', error);
+            alert('Error processing request. Please try again.');
+            pinInputs.forEach(input => input.value = '');
+            pinInputs[0].focus();
         });
     });
 
@@ -598,8 +739,9 @@ function handleDashboardPage() {
     window.cancelAppointment = function(appointmentId) {
         // Store the appointment ID and show PIN modal
         document.getElementById('appointmentToCancel').value = appointmentId;
-        pinInputs.forEach(input => input.value = ''); // Clear previous inputs
-        pinInputs[0].focus(); // Focus first input
+        document.querySelectorAll('#pinVerificationModal .pin-input').forEach(input => input.value = ''); // Clear previous inputs
+        document.querySelector('#pinVerificationModal .pin-input').focus(); // Focus first input
+        const pinModal = new bootstrap.Modal(document.getElementById('pinVerificationModal'));
         pinModal.show();
     };
 
@@ -624,48 +766,40 @@ function handleDashboardPage() {
 
     // Handle confirmation button click
     document.getElementById('confirmCancellation').addEventListener('click', function() {
+        const pinInputs = document.querySelectorAll('#pinVerificationModal .pin-input');
         const pin = Array.from(pinInputs).map(input => input.value).join('');
         const appointmentId = document.getElementById('appointmentToCancel').value;
 
         if (pin.length !== 4) {
-            alert('Please enter a valid 4-digit PIN');
+            document.getElementById('pinError').textContent = 'Please enter a valid 4-digit PIN';
+            document.getElementById('pinError').style.display = 'block';
             return;
         }
 
-        // First verify PIN
-        fetch('verify_pin.php', {
+        // Send both PIN and appointment ID to cancel_appointment.php
+        fetch('cancel_appointment.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: 'pin=' + pin
+            body: `appointment_id=${appointmentId}&pin=${pin}`
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // If PIN is correct, proceed with cancellation
-                return fetch('cancel_appointment.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: 'appointment_id=' + appointmentId
-                });
-            } else {
-                throw new Error('Incorrect PIN');
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
+                const pinModal = bootstrap.Modal.getInstance(document.getElementById('pinVerificationModal'));
                 pinModal.hide();
                 location.reload();
             } else {
-                alert(data.message || 'Error cancelling appointment');
+                document.getElementById('pinError').textContent = data.message || 'Error cancelling appointment';
+                document.getElementById('pinError').style.display = 'block';
+                pinInputs.forEach(input => input.value = '');
+                pinInputs[0].focus();
             }
         })
         .catch(error => {
-            alert(error.message || 'Error processing request');
+            document.getElementById('pinError').textContent = 'Error processing request. Please try again.';
+            document.getElementById('pinError').style.display = 'block';
         });
     });
 

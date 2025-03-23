@@ -8,6 +8,34 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'client') {
     exit;
 }
 
+// Function to send notification to admin
+function sendNotification($pdo, $userId, $title, $message, $type, $referenceId, $recipientId) {
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO notifications 
+            (user_id, title, message, type, reference_id, recipient_id, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, NOW())
+        ");
+        return $stmt->execute([$userId, $title, $message, $type, $referenceId, $recipientId]);
+    } catch (Exception $e) {
+        error_log("Error sending notification: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Get admin user ID
+function getAdminUserId($pdo) {
+    try {
+        $stmt = $pdo->prepare("SELECT user_id FROM users WHERE role = 'admin' LIMIT 1");
+        $stmt->execute();
+        $admin = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $admin ? $admin['user_id'] : null;
+    } catch (Exception $e) {
+        error_log("Error getting admin user ID: " . $e->getMessage());
+        return null;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         // Verify reCAPTCHA first
@@ -84,6 +112,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $time,
             $servicesString,
         ]);
+
+        $appointmentId = $pdo->lastInsertId();
+        
+        // Get admin user ID
+        $adminUserId = getAdminUserId($pdo);
+        
+        if ($adminUserId) {
+            // Create notification for admin
+            $notificationTitle = "New Appointment Request";
+            $notificationMessage = "A new appointment has been requested by " . $_SESSION['name'] . 
+                                " for " . $servicesString . 
+                                " on " . date('M d, Y', strtotime($date)) . 
+                                " at " . date('h:i A', strtotime($time));
+            
+            sendNotification(
+                $pdo,
+                $_SESSION['user_id'], // sender (client)
+                $notificationTitle,
+                $notificationMessage,
+                'system',
+                $appointmentId,
+                $adminUserId // recipient (admin)
+            );
+        }
 
         $_SESSION['success_message'] = 'Appointment booked successfully!';
         header('Location: client/dashboard.php');

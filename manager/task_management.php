@@ -121,10 +121,6 @@ if (!$project) {
                                 <h6 class="card-title mb-0">
                                     <i class="fas fa-list me-2"></i>Task Categories
                                 </h6>
-                                <button class="btn btn-sm btn-primary" id="addCategoryBtn">
-                                    <i class="fas fa-plus me-1"></i>Add Category
-                                </button>
-
                             </div>
                             <div class="row" id="categoryList">
                                 <!-- Categories will be loaded dynamically -->
@@ -166,36 +162,6 @@ if (!$project) {
                     </div>
                 </div>
                     </div>
-        </div>
-    </div>
-
-    <!-- Add Category Modal -->
-    <div class="modal fade" id="addCategoryModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-light">
-                    <h5 class="modal-title">
-                        <i class="fas fa-folder-plus me-2"></i>Add Category
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="addCategoryForm">
-                        <div class="mb-3">
-                            <label class="form-label">Category Name</label>
-                            <input type="text" class="form-control" id="categoryName" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Description</label>
-                            <textarea class="form-control" id="categoryDescription" rows="3"></textarea>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="saveCategoryBtn">Save Category</button>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -255,7 +221,15 @@ if (!$project) {
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Due Date</label>
-                                    <input type="date" class="form-control" id="taskDueDate" required>
+                                    <input type="date" class="form-control" id="taskDueDate" required 
+                                           min="<?php echo $project['start_date']; ?>"
+                                           max="<?php echo $project['end_date']; ?>" 
+                                           data-project-start="<?php echo $project['start_date']; ?>"
+                                           data-project-end="<?php echo $project['end_date']; ?>">
+                                    <div class="form-text text-muted">
+                                        Project duration: <?php echo date('M d, Y', strtotime($project['start_date'])); ?> - 
+                                        <?php echo date('M d, Y', strtotime($project['end_date'])); ?>
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -418,57 +392,33 @@ if (!$project) {
         if (taskDueDate) {
             const today = new Date().toISOString().split('T')[0];
             taskDueDate.min = today;
-        }
-
-        // Add Category Modal handlers
-        const addCategoryModal = new bootstrap.Modal(document.getElementById('addCategoryModal'));
-        
-        // Add Category button click handler
-        document.getElementById('addCategoryBtn')?.addEventListener('click', function() {
-            document.getElementById('addCategoryForm').reset();
-            addCategoryModal.show();
-        });
-
-        // Save Category button click handler
-        document.getElementById('saveCategoryBtn')?.addEventListener('click', async function() {
-            const categoryName = document.getElementById('categoryName').value.trim();
-            const categoryDescription = document.getElementById('categoryDescription').value.trim();
-
-            if (!categoryName) {
-                showAlert('error', 'Category name is required');
-                return;
-            }
-
-            try {
-                const response = await fetch(`api/tasks.php?action=category&project_id=${projectId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        category_name: categoryName,
-                        description: categoryDescription
-                    })
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to add category');
+            
+            // Add event listener for date validation
+            taskDueDate.addEventListener('change', function() {
+                const projectStartDate = new Date(this.getAttribute('data-project-start'));
+                const projectEndDate = new Date(this.getAttribute('data-project-end'));
+                const selectedDate = new Date(this.value);
+                
+                if (selectedDate < projectStartDate) {
+                    alert('Task due date cannot be before project start date: ' + 
+                          projectStartDate.toLocaleDateString('en-US', { 
+                              month: 'long', 
+                              day: 'numeric', 
+                              year: 'numeric' 
+                          }));
+                    this.value = this.getAttribute('data-project-start');
                 }
-
-                // Close modal and reset form
-                addCategoryModal.hide();
-                document.getElementById('addCategoryForm').reset();
-
-                // Reload categories
-                await loadCategories();
-                showAlert('success', 'Category added successfully');
-            } catch (error) {
-                console.error('Error adding category:', error);
-                showAlert('error', 'Failed to add category');
-            }
-        });
+                else if (selectedDate > projectEndDate) {
+                    alert('Task due date cannot exceed project end date: ' + 
+                          projectEndDate.toLocaleDateString('en-US', { 
+                              month: 'long', 
+                              day: 'numeric', 
+                              year: 'numeric' 
+                          }));
+                    this.value = this.getAttribute('data-project-end');
+                }
+            });
+        }
 
         // Add Task Modal handlers
         const addTaskModal = new bootstrap.Modal(document.getElementById('addTaskModal'));
@@ -508,6 +458,20 @@ if (!$project) {
             const dueDate = document.getElementById('taskDueDate').value;
             const description = document.getElementById('taskDescription').value.trim();
             const assignees = JSON.parse(document.getElementById('taskAssignees').value || '[]');
+
+            // Validate due date against project dates
+            const projectStartDate = new Date(taskDueDate.getAttribute('data-project-start'));
+            const projectEndDate = new Date(taskDueDate.getAttribute('data-project-end'));
+            const selectedDueDate = new Date(dueDate);
+            
+            if (selectedDueDate < projectStartDate) {
+                showAlert('error', 'Task due date cannot be before project start date');
+                return;
+            }
+            else if (selectedDueDate > projectEndDate) {
+                showAlert('error', 'Task due date cannot exceed project end date');
+                return;
+            }
 
             if (!taskName || !categoryId || !dueDate || assignees.length === 0) {
                 showAlert('error', 'Please fill in all required fields and assign at least one person');
@@ -692,26 +656,19 @@ if (!$project) {
                     categoryList.innerHTML = `
                         <div class="col-12 text-center text-muted py-4">
                             <i class="fas fa-list fa-2x mb-3"></i>
-                            <p class="mb-0">No categories added yet</p>
+                            <p class="mb-0">No categories found</p>
                         </div>
                     `;
                 }
                 return;
             }
 
-            // Sort categories by created_at in ascending order (oldest first)
-            const sortedCategories = data.categories.sort((a, b) => 
-                new Date(a.created_at) - new Date(b.created_at)
-            );
-
             let previousCategoryCompleted = true; // First category is always available
 
-            // Add categories to the list and dropdown
-            sortedCategories.forEach((category, index) => {
-                // Add to category list
+            data.categories.forEach((category, index) => {
                 if (categoryList) {
                     const categoryCol = document.createElement('div');
-                    categoryCol.className = 'col-md-4 mb-3';
+                    categoryCol.className = 'col-md-6 mb-3';
                     
                     const isLocked = !previousCategoryCompleted;
                     const statusClass = category.status === 'completed' ? 'success' : 

@@ -8,7 +8,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
     exit;
 }
 
-// Get all active (non-archived) users with client role
+// Get all archived users
 $query = "SELECT 
     u.user_id,
     u.name,
@@ -17,7 +17,7 @@ $query = "SELECT
     u.date_created
 FROM users u 
 WHERE u.role = 'client' 
-AND u.archived = 'No'  /* Add this condition to filter out archived users */
+AND u.archived = 'Yes'
 ORDER BY u.date_created DESC";
 $stmt = $pdo->prepare($query);
 $stmt->execute();
@@ -29,7 +29,7 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Management | Admin Dashboard</title>
+    <title>Archived Users | Admin Dashboard</title>
 
     <!-- CSS -->
     <link rel="stylesheet" href="../css/style.css">
@@ -44,7 +44,7 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../js/script.js"></script>
 </head>
-<body id="adminUsersPage">
+<body id="adminArchivedUsersPage">
     <div class="admin-dashboard-wrapper">
         <?php include 'admin_header.php'; ?>
         
@@ -52,11 +52,11 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <!-- Page Header -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h4 class="mb-0">User Management</h4>
+                    <h4 class="mb-0">Archived Users</h4>
                 </div>
                 <div>
-                    <a href="archived_users.php" class="btn btn-secondary">
-                        <i class="fas fa-archive"></i> Archived Users
+                    <a href="users.php" class="btn btn-primary">
+                        <i class="fas fa-arrow-left"></i> Back to Users
                     </a>
                 </div>
             </div>
@@ -85,9 +85,9 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                             onclick="viewUser(<?php echo $user['user_id']; ?>)">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
-                                                    <button type="button" class="btn btn-sm btn-danger" 
-                                                            onclick="archiveUser(<?php echo $user['user_id']; ?>)">
-                                                        <i class="fas fa-archive"></i>
+                                                    <button type="button" class="btn btn-sm btn-success" 
+                                                            onclick="unarchiveUser(<?php echo $user['user_id']; ?>)">
+                                                        <i class="fas fa-box-open"></i>
                                                     </button>
                                                 </div>
                                             </td>
@@ -95,7 +95,7 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="3" class="text-center">No users found</td>
+                                        <td colspan="3" class="text-center">No archived users found</td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
@@ -106,7 +106,7 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-    <!-- View User Modal -->
+    <!-- Update the View User Modal section with the complete code -->
     <div class="modal fade" id="viewUserModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -179,9 +179,9 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             });
     }
 
-    function archiveUser(userId) {
-        if (confirm('Are you sure you want to archive this user?')) {
-            fetch('archive_user.php', {
+    function unarchiveUser(userId) {
+        if (confirm('Are you sure you want to unarchive this user?')) {
+            fetch('unarchive_user.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -193,15 +193,15 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('User archived successfully');
+                    alert('User unarchived successfully');
                     location.reload();
                 } else {
-                    alert(data.message || 'Error archiving user');
+                    alert(data.message || 'Error unarchiving user');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error archiving user');
+                alert('Error unarchiving user');
             });
         }
     }

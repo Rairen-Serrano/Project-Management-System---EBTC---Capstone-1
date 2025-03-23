@@ -148,7 +148,6 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                                             <th>Assigned Date</th>
                                             <th>Due Date</th>
                                             <th>Status</th>
-                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -176,10 +175,10 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
 
                                         foreach ($tasks as $task) {
                                             // Determine status class
-                                            $statusClass = match($task['status']) {
-                                                'Completed' => 'bg-success',
-                                                'In Progress' => 'bg-primary',
-                                                'Pending' => 'bg-warning',
+                                            $statusClass = match(strtolower($task['status'])) {
+                                                'completed' => 'bg-success',
+                                                'in_progress' => 'bg-primary',
+                                                'pending' => 'bg-warning',
                                                 default => 'bg-secondary'
                                             };
 
@@ -215,30 +214,6 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                                                     <span class="badge <?php echo $statusClass; ?>">
                                                         <?php echo $task['status']; ?>
                                                     </span>
-                                                </td>
-                                                <td>
-                                                    <div class="dropdown">
-                                                        <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
-                                                            <i class="fas fa-ellipsis-v"></i>
-                                                        </button>
-                                                        <ul class="dropdown-menu">
-                                                            <li>
-                                                                <a class="dropdown-item" href="task_details.php?id=<?php echo $task['task_id']; ?>">
-                                                                    <i class="fas fa-eye me-2"></i>View Details
-                                                                </a>
-                                                            </li>
-                                                            <li>
-                                                                <a class="dropdown-item" href="update_task.php?id=<?php echo $task['task_id']; ?>">
-                                                                    <i class="fas fa-edit me-2"></i>Update Progress
-                                                                </a>
-                                                            </li>
-                                                            <li>
-                                                                <a class="dropdown-item" href="#" onclick="addTaskNote(<?php echo $task['task_id']; ?>)">
-                                                                    <i class="fas fa-comment me-2"></i>Add Note
-                                                                </a>
-                                                            </li>
-                                                        </ul>
-                                                    </div>
                                                 </td>
                                             </tr>
                                         <?php } ?>
@@ -417,7 +392,15 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                         // Refresh the page to ensure everything is properly loaded
                         window.location.reload();
                     } else {
+                        document.getElementById('pinError').textContent = data.message || 'Invalid PIN. Please try again.';
                         document.getElementById('pinError').style.display = 'block';
+                        
+                        if (data.lockout_duration) {
+                            // Disable the verify button and show countdown
+                            verifyPinBtn.disabled = true;
+                            startLockoutCountdown(data.lockout_duration);
+                        }
+                        
                         pinInputs.forEach(input => input.value = '');
                         pinInputs[0].focus();
                     }
@@ -428,6 +411,28 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                     document.getElementById('pinError').style.display = 'block';
                 });
             });
+        }
+
+        function startLockoutCountdown(duration) {
+            const verifyBtn = document.getElementById('verifyPinBtn');
+            const errorDiv = document.getElementById('pinError');
+            let timeLeft = duration;
+
+            const countdownInterval = setInterval(() => {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                errorDiv.textContent = `Account locked. Please try again in ${minutes}:${seconds.toString().padStart(2, '0')} minutes`;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    verifyBtn.disabled = false;
+                    errorDiv.textContent = 'You can now try again.';
+                    setTimeout(() => {
+                        errorDiv.style.display = 'none';
+                    }, 3000);
+                }
+                timeLeft--;
+            }, 1000);
         }
 
         // Load Dashboard Data

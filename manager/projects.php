@@ -19,9 +19,13 @@ $query = "
         u.name as client_name,
         u.email as client_email,
         u.phone as client_phone,
+        a.service as service,
+        a.date as appointment_date,
+        a.time as appointment_time,
         GROUP_CONCAT(DISTINCT CONCAT(up.name, '|', up.role, '|', up.email) SEPARATOR '||') as assigned_personnel
     FROM projects p
     JOIN users u ON p.client_id = u.user_id
+    JOIN appointments a ON p.appointment_id = a.appointment_id
     LEFT JOIN project_assignees pa ON p.project_id = pa.project_id
     LEFT JOIN users up ON pa.user_id = up.user_id
 ";
@@ -145,11 +149,11 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
-                                    <th style="width: 20%">Client</th>
-                                    <th style="width: 30%">Service</th>
-                                    <th style="width: 15%">Date</th>
-                                    <th style="width: 15%">Status</th>
-                                    <th style="width: 20%">Actions</th>
+                                    <th style="width: 20%" class="text-start">Client</th>
+                                    <th style="width: 35%" class="text-start">Service</th>
+                                    <th style="width: 25%" class="text-start">Date</th>
+                                    <th style="width: 10%" class="text-center">Status</th>
+                                    <th style="width: 10%" class="text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -160,25 +164,53 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <?php else: ?>
                                     <?php foreach ($projects as $project): ?>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($project['client_name']); ?></td>
-                                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                            <?php echo htmlspecialchars($project['service']); ?>
+                                        <td class="text-start">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-user-circle text-muted me-2"></i>
+                                                <?php echo htmlspecialchars($project['client_name']); ?>
+                                            </div>
                                         </td>
-                                        <td>
-                                            <div class="fs-6"><?php echo date('M d, Y', strtotime($project['date'])); ?></div>
-                                            <div class="text-muted"><?php echo date('h:i A', strtotime($project['time'])); ?></div>
+                                        <td class="text-start">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-briefcase text-muted me-2"></i>
+                                                <?php 
+                                                $stmt = $pdo->prepare("
+                                                    SELECT service 
+                                                    FROM appointments 
+                                                    WHERE appointment_id = ?
+                                                ");
+                                                $stmt->execute([$project['appointment_id']]);
+                                                $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+                                                echo htmlspecialchars($appointment['service'] ?? 'N/A'); 
+                                                ?>
+                                            </div>
                                         </td>
-                                        <td>
+                                        <td class="text-start">
+                                            <div class="small">
+                                                <?php 
+                                                if ($project['start_date'] && $project['end_date']) {
+                                                    echo '<div><i class="fas fa-calendar-alt text-muted me-2"></i><strong>Start:</strong> ' . 
+                                                         date('M d, Y', strtotime($project['start_date'])) . '</div>';
+                                                    echo '<div><i class="fas fa-calendar-check text-muted me-2"></i><strong>End:</strong> ' . 
+                                                         date('M d, Y', strtotime($project['end_date'])) . '</div>';
+                                                } else {
+                                                    echo 'Not set';
+                                                }
+                                                ?>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
                                             <?php
                                             $statusClass = $project['status'] === 'completed' ? 'bg-success' : 'bg-primary';
                                             ?>
-                                            <span class="badge <?php echo $statusClass; ?> px-3 py-2">
+                                            <span class="badge <?php echo $statusClass; ?>">
                                                 <?php echo ucfirst($project['status']); ?>
                                             </span>
                                         </td>
-                                        <td>
-                                            <button type="button" class="btn btn-sm btn-info" onclick='viewProject(<?php echo json_encode($project); ?>)'>
-                                                <i class="fas fa-eye"></i> View
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-sm btn-info" 
+                                                    onclick='viewProject(<?php echo json_encode($project); ?>)'>
+                                                <i class="fas fa-eye"></i>
                                             </button>
                                         </td>
                                     </tr>
@@ -256,35 +288,10 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="col-12">
                             <div class="card">
                                 <div class="card-body">
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <h6 class="card-title mb-0">
-                                            <i class="fas fa-users me-2"></i>Assigned Personnel
-                                        </h6>
-                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="showPersonnelSearch()">
-                                            <i class="fas fa-plus"></i>
-                                        </button>
-                                    </div>
+                                    <h6 class="card-title mb-3">
+                                        <i class="fas fa-users me-2"></i>Assigned Personnel
+                                    </h6>
                                     
-                                    <!-- Search Personnel Form (Hidden by default) -->
-                                    <div id="personnelSearchForm" class="mb-3" style="display: none;">
-                                        <div class="position-relative">
-                                            <div class="input-group">
-                                                <input type="text" class="form-control" id="personnelSearchInput" 
-                                                    placeholder="Search by name or email..." autocomplete="off">
-                                                <button class="btn btn-outline-secondary" type="button" onclick="searchPersonnel()">
-                                                    <i class="fas fa-search"></i>
-                                                </button>
-                                            </div>
-                                            <!-- Suggestions Dropdown -->
-                                            <div id="searchSuggestions" class="position-absolute w-100 mt-1 d-none">
-                                                <div class="list-group shadow-sm" style="max-height: 200px; overflow-y: auto;">
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <!-- Search Results -->
-                                        <div id="personnelSearchResults" class="mt-2"></div>
-                                    </div>
-
                                     <div class="table-responsive">
                                         <table class="table table-hover">
                                             <thead>
@@ -560,7 +567,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         assignPersonnelModal = new bootstrap.Modal(document.getElementById('assignPersonnelModal'));
         viewProjectModal = new bootstrap.Modal(document.getElementById('viewProjectModal'));
 
-        // Set minimum date for start date (tomorrow)
+        // Set minimum date for start date
         const today = new Date();
         const tomorrow = new Date(today);
         tomorrow.setDate(today.getDate() + 1);
@@ -568,12 +575,22 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         const startDateInput = document.getElementById('projectStartDate');
         const endDateInput = document.getElementById('projectEndDate');
         
-        // Format dates to YYYY-MM-DD
-        startDateInput.min = tomorrow.toISOString().split('T')[0];
-        
-        // Prevent selecting today's date
+        // Prevent selecting date before appointment date
         startDateInput.addEventListener('input', function() {
             const selectedDate = new Date(this.value);
+            const appointmentDate = new Date(currentAppointment.date);
+            
+            // Reset time part for accurate date comparison
+            selectedDate.setHours(0, 0, 0, 0);
+            appointmentDate.setHours(0, 0, 0, 0);
+            
+            if (selectedDate < appointmentDate) {
+                alert('Start date cannot be before the appointment date: ' + currentAppointment.date);
+                this.value = ''; // Clear invalid selection
+                endDateInput.value = ''; // Clear end date as well
+                return;
+            }
+            
             if (selectedDate <= today) {
                 alert('Start date must be after today');
                 this.value = ''; // Clear invalid selection
@@ -690,280 +707,154 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
         // Send request to create project and assign personnel
-        fetch('add_project.php', {
+        fetch('api/create_project.php', {
             method: 'POST',
             body: formData
         })
         .then(response => response.json())
         .then(data => {
-            console.log('Project creation response:', data); // Debug log
+            console.log('Project creation response:', data);
             
             if (data.success && data.project_id) {
-                // Send notifications to client and assigned personnel
+                // Create default task categories
+                return fetch('api/create_task_categories.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        project_id: data.project_id,
+                        categories: [
+                            {
+                                name: 'Project Planning and Design',
+                                description: 'Initial phase focusing on project scope definition, timeline planning, and technical design specifications.'
+                            },
+                            {
+                                name: 'Materials Selection and Procurement',
+                                description: 'Selection and acquisition of necessary materials, equipment, and resources for the project.'
+                            },
+                            {
+                                name: 'Project Execution',
+                                description: 'Implementation phase where the main project work is carried out according to specifications.'
+                            },
+                            {
+                                name: 'Maintenance and Optimization',
+                                description: 'Final phase ensuring project sustainability, performance optimization, and maintenance planning.'
+                            }
+                        ]
+                    })
+                }).then(response => response.json());
+            } else {
+                throw new Error(data.message || 'Project creation failed');
+            }
+        })
+        .then(categoryData => {
+            console.log('Category creation response:', categoryData);
+            if (categoryData.success) {
+                // Send notifications
                 const notificationData = new FormData();
-                notificationData.append('project_id', data.project_id.toString()); // Ensure project_id is a string
+                notificationData.append('project_id', categoryData.project_id.toString());
                 notificationData.append('personnel', JSON.stringify(selectedPersonnel));
                 notificationData.append('service', currentAppointment.service);
 
-                // Return the fetch promise for chaining
                 return fetch('send_project_notifications.php', {
                     method: 'POST',
                     body: notificationData
                 });
             } else {
-                throw new Error(data.message || 'Project created but project ID not returned');
+                throw new Error(categoryData.message || 'Failed to create task categories');
             }
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            console.log('Notification response:', data); // Debug log
+            console.log('Notification response:', data);
             if (data.success) {
                 assignPersonnelModal.hide();
-                alert('Project created and notifications sent successfully!');
+                alert('Project created successfully with task categories!');
                 location.reload();
             } else {
-                console.error('Notification error:', data);
-                alert(data.message || 'Project created but failed to send notifications');
-                location.reload();
+                throw new Error(data.message || 'Failed to send notifications');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            // Still reload since project was created
-            alert('Project created but notification sending failed: ' + error.message);
-            location.reload();
+            alert('Error: ' + error.message);
         });
     }
 
     function viewProject(project) {
-        try {
-            console.log('View Project Data:', project);
-            
-            if (!project) {
-                throw new Error('No project data provided');
-            }
+        // Update modal content
+        document.getElementById('modalClientName').textContent = project.client_name;
+        document.getElementById('modalClientEmail').textContent = project.client_email;
+        document.getElementById('modalClientPhone').textContent = project.client_phone;
+        document.getElementById('modalService').textContent = project.service;
+        
+        // Format appointment date and time
+        const appointmentDate = project.appointment_date ? new Date(project.appointment_date) : null;
+        document.getElementById('modalDate').textContent = appointmentDate ? 
+            appointmentDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set';
+        
+        document.getElementById('modalTime').textContent = project.appointment_time || 'Not set';
+        
+        // Format project dates
+        const startDate = project.start_date ? new Date(project.start_date) : null;
+        const endDate = project.end_date ? new Date(project.end_date) : null;
+        
+        document.getElementById('modalStartDate').textContent = startDate ? 
+            startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set';
+        document.getElementById('modalEndDate').textContent = endDate ? 
+            endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set';
 
-            // Store the project ID for use in other functions
-            currentProjectId = project.project_id;
+        // Update status with proper styling
+        const statusElement = document.getElementById('modalStatus');
+        statusElement.textContent = project.status.charAt(0).toUpperCase() + project.status.slice(1);
+        statusElement.className = `badge ${project.status === 'completed' ? 'bg-success' : 'bg-primary'} px-3 py-2`;
 
-            // Fill in the modal with project details
-            document.getElementById('modalClientName').textContent = project.client_name || 'N/A';
-            document.getElementById('modalClientEmail').textContent = project.client_email || 'N/A';
-            document.getElementById('modalClientPhone').textContent = project.client_phone || 'N/A';
-            document.getElementById('modalService').textContent = project.service || 'N/A';
-            
-            // Format appointment date and time
-            if (project.date) {
-                document.getElementById('modalDate').textContent = new Date(project.date).toLocaleDateString('en-US', { 
-                    month: 'long', 
-                    day: 'numeric', 
-                    year: 'numeric' 
-                });
-            } else {
-                document.getElementById('modalDate').textContent = 'N/A';
-            }
-            
-            if (project.time) {
-                document.getElementById('modalTime').textContent = new Date('2000-01-01 ' + project.time).toLocaleTimeString('en-US', { 
-                    hour: 'numeric', 
-                    minute: '2-digit' 
-                });
-            } else {
-                document.getElementById('modalTime').textContent = 'N/A';
-            }
+        // Update notes
+        document.getElementById('modalNotes').textContent = project.notes || 'No notes available';
 
-            // Format project dates
-            if (project.start_date) {
-                document.getElementById('modalStartDate').textContent = new Date(project.start_date).toLocaleDateString('en-US', {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric'
-                });
-            } else {
-                document.getElementById('modalStartDate').textContent = 'N/A';
-            }
-
-            if (project.end_date) {
-                document.getElementById('modalEndDate').textContent = new Date(project.end_date).toLocaleDateString('en-US', {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric'
-                });
-            } else {
-                document.getElementById('modalEndDate').textContent = 'N/A';
-            }
-            
-            // Update status with badge
-            const statusClass = project.status === 'completed' ? 'bg-success' : 'bg-primary';
-            document.getElementById('modalStatus').innerHTML = `
-                <span class="badge ${statusClass} px-3 py-2">
-                    ${(project.status || 'Unknown').charAt(0).toUpperCase() + (project.status || 'Unknown').slice(1)}
-                </span>
+        // Update quotation file
+        const quotationFileElement = document.getElementById('modalQuotationFile');
+        if (project.quotation_file) {
+            quotationFileElement.innerHTML = `
+                <a href="../uploads/quotations/${project.quotation_file}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-file-pdf me-2"></i>View Quotation
+                </a>
             `;
+        } else {
+            quotationFileElement.innerHTML = '<p class="text-muted mb-0">No quotation file uploaded</p>';
+        }
 
-            // Display project notes
-            document.getElementById('modalNotes').textContent = project.notes || 'No notes available';
-
-            // Display quotation file
-            const quotationFileElement = document.getElementById('modalQuotationFile');
-            if (project.quotation_file) {
-                quotationFileElement.innerHTML = `
-                    <a href="../uploads/quotations/${project.quotation_file}" target="_blank" class="btn btn-sm btn-primary">
-                        <i class="fas fa-file-pdf me-2"></i>View Quotation
-                    </a>
-                `;
-            } else {
-                quotationFileElement.innerHTML = '<p class="text-muted mb-0">No quotation file available</p>';
-            }
-
-            // Display assigned personnel
-            const personnelList = document.getElementById('modalPersonnelList');
-            personnelList.innerHTML = '';
-
-            if (project.assigned_personnel) {
-                const personnel = project.assigned_personnel.split('||');
-                personnel.forEach(person => {
-                    const [name, role, email] = person.split('|');
-                    personnelList.innerHTML += `
-                        <tr>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-hard-hat text-muted me-2"></i>
-                                    ${name}
-                                </div>
-                            </td>
-                            <td>
-                                <span class="badge bg-secondary">${role}</span>
-                            </td>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-envelope text-muted me-2"></i>
-                                    ${email}
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                });
-            } else {
-                personnelList.innerHTML = `
+        // Update personnel list
+        const personnelList = document.getElementById('modalPersonnelList');
+        personnelList.innerHTML = '';
+        
+        if (project.assigned_personnel) {
+            const personnel = project.assigned_personnel.split('||');
+            personnel.forEach(person => {
+                const [name, role, email] = person.split('|');
+                personnelList.innerHTML += `
                     <tr>
-                        <td colspan="3" class="text-center text-muted">
-                            No personnel assigned to this project
-                        </td>
+                        <td>${name}</td>
+                        <td><span class="badge bg-secondary">${role}</span></td>
+                        <td>${email}</td>
                     </tr>
                 `;
-            }
-
-            // Show/hide complete button and disable other functions based on project status
-            const completeProjectBtn = document.getElementById('completeProjectBtn');
-            const taskManagementBtn = document.querySelector('button[onclick="redirectToTaskManagement()"]');
-            const addPersonnelBtn = document.querySelector('button[onclick="showPersonnelSearch()"]');
-            
-            if (project.status === 'completed') {
-                // Hide complete button
-                completeProjectBtn.style.display = 'none';
-                
-                // Disable and update task management button
-                taskManagementBtn.disabled = true;
-                taskManagementBtn.classList.remove('btn-success');
-                taskManagementBtn.classList.add('btn-secondary');
-                taskManagementBtn.innerHTML = '<i class="fas fa-tasks me-2"></i>Task Management (Project Completed)';
-                
-                // Hide add personnel button
-                addPersonnelBtn.style.display = 'none';
-            } else {
-                // Show/enable all buttons for ongoing projects
-                completeProjectBtn.style.display = 'block';
-                taskManagementBtn.disabled = false;
-                taskManagementBtn.classList.remove('btn-secondary');
-                taskManagementBtn.classList.add('btn-success');
-                taskManagementBtn.innerHTML = '<i class="fas fa-tasks me-2"></i>Task Management';
-                addPersonnelBtn.style.display = 'block';
-            }
-
-            // Show the modal
-            if (!viewProjectModal) {
-                console.error('View project modal not initialized');
-                viewProjectModal = new bootstrap.Modal(document.getElementById('viewProjectModal'));
-            }
-            viewProjectModal.show();
-        } catch (error) {
-            console.error('Error viewing project:', error);
-            alert('There was an error viewing the project details. Please try again.');
-        }
-    }
-
-    function assignAdditionalPersonnel() {
-        if (!currentProjectId) {
-            alert('No project selected');
-            return;
+            });
         }
 
-        // Close the view modal
-        viewProjectModal.hide();
-
-        // Get all available personnel
-        const personnelSelects = document.querySelectorAll('.personnel-select');
-        
-        // Show the assign personnel modal
-        const assignModal = new bootstrap.Modal(document.getElementById('assignPersonnelModal'));
-        
-        // Clear previous selections
-        personnelSelects.forEach(checkbox => checkbox.checked = false);
-        document.getElementById('selectAllPersonnel').checked = false;
-        
-        // Update modal title and button text for additional assignment
-        document.querySelector('#assignPersonnelModal .modal-title').innerHTML = 
-            '<i class="fas fa-user-plus me-2"></i>Assign Additional Personnel';
-        
-        // Change the confirm button action
-        const confirmButton = document.querySelector('#assignPersonnelModal .btn-primary');
-        confirmButton.textContent = 'Assign Additional Personnel';
-        confirmButton.onclick = confirmAdditionalPersonnelAssignment;
-        
-        assignModal.show();
-    }
-
-    function confirmAdditionalPersonnelAssignment() {
-        // Get selected personnel
-        const selectedPersonnel = Array.from(document.querySelectorAll('.personnel-select:checked'))
-            .map(checkbox => checkbox.value);
-
-        if (selectedPersonnel.length === 0) {
-            alert('Please select at least one personnel to assign to the project.');
-            return;
+        // Show/hide complete button based on status
+        const completeProjectBtn = document.getElementById('completeProjectBtn');
+        if (completeProjectBtn) {
+            completeProjectBtn.style.display = project.status === 'completed' ? 'none' : 'block';
         }
 
-        // Create FormData object
-        const formData = new FormData();
-        formData.append('project_id', currentProjectId);
-        formData.append('personnel', JSON.stringify(selectedPersonnel));
+        // Store current project ID
+        currentProjectId = project.project_id;
 
-        // Send request to assign additional personnel
-        fetch('assign_additional_personnel.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const assignModal = bootstrap.Modal.getInstance(document.getElementById('assignPersonnelModal'));
-                assignModal.hide();
-                alert('Additional personnel assigned successfully!');
-                location.reload();
-            } else {
-                alert(data.message || 'Failed to assign additional personnel');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Failed to assign additional personnel');
-        });
+        // Show the modal
+        const viewProjectModal = new bootstrap.Modal(document.getElementById('viewProjectModal'));
+        viewProjectModal.show();
     }
 
     function redirectToTaskManagement() {
@@ -984,222 +875,6 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         // Redirect to the task management page with the project ID
         window.location.href = `task_management.php?project_id=${currentProjectId}`;
     }
-
-    let searchTimeout = null;
-
-    function showPersonnelSearch() {
-        // Get the current project status from the modal
-        const statusElement = document.getElementById('modalStatus');
-        const currentStatus = statusElement.textContent.trim().toLowerCase();
-        
-        if (currentStatus === 'completed') {
-            alert('Cannot add personnel to completed projects.');
-            return;
-        }
-
-        const searchForm = document.getElementById('personnelSearchForm');
-        const searchInput = document.getElementById('personnelSearchInput');
-        searchForm.style.display = 'block';
-        searchInput.focus();
-        
-        // Clear previous search
-        document.getElementById('personnelSearchResults').innerHTML = '';
-        document.getElementById('searchSuggestions').classList.add('d-none');
-        searchInput.value = '';
-
-        // Add input event listener for suggestions
-        searchInput.addEventListener('input', handleSearchInput);
-        
-        // Add click event listener to document to hide suggestions when clicking outside
-        document.addEventListener('click', handleClickOutside);
-    }
-
-    function handleClickOutside(event) {
-        const suggestions = document.getElementById('searchSuggestions');
-        const searchInput = document.getElementById('personnelSearchInput');
-        
-        if (!suggestions.contains(event.target) && event.target !== searchInput) {
-            suggestions.classList.add('d-none');
-        }
-    }
-
-    function handleSearchInput(event) {
-        const searchTerm = event.target.value.trim();
-        const suggestions = document.getElementById('searchSuggestions');
-        
-        // Clear previous timeout
-        if (searchTimeout) {
-            clearTimeout(searchTimeout);
-        }
-
-        // Hide suggestions if search term is empty
-        if (!searchTerm) {
-            suggestions.classList.add('d-none');
-            return;
-        }
-
-        // Set new timeout for search
-        searchTimeout = setTimeout(() => {
-            fetchSuggestions(searchTerm);
-        }, 300); // Wait 300ms after user stops typing
-    }
-
-    function fetchSuggestions(searchTerm) {
-        const formData = new FormData();
-        formData.append('search_term', searchTerm);
-        formData.append('project_id', currentProjectId);
-
-        fetch('search_personnel.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            const suggestions = document.getElementById('searchSuggestions');
-            const suggestionsList = suggestions.querySelector('.list-group');
-            suggestionsList.innerHTML = '';
-
-            if (data.success && data.personnel.length > 0) {
-                data.personnel.forEach(person => {
-                    const item = document.createElement('button');
-                    item.type = 'button';
-                    item.className = 'list-group-item list-group-item-action';
-                    item.innerHTML = `
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-bold">${person.name}</div>
-                                <small class="text-muted">${person.email}</small>
-                            </div>
-                            <span class="badge bg-secondary">${person.role}</span>
-                        </div>
-                    `;
-                    
-                    // Add click handler for suggestion
-                    item.addEventListener('click', () => {
-                        assignPersonnel(person.user_id);
-                    });
-                    
-                    suggestionsList.appendChild(item);
-                });
-                
-                suggestions.classList.remove('d-none');
-            } else {
-                suggestions.classList.add('d-none');
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching suggestions:', error);
-        });
-    }
-
-    function searchPersonnel() {
-        const searchTerm = document.getElementById('personnelSearchInput').value.trim();
-        if (!searchTerm) {
-            alert('Please enter a search term');
-            return;
-        }
-
-        // Hide suggestions
-        document.getElementById('searchSuggestions').classList.add('d-none');
-
-        // Create FormData object
-        const formData = new FormData();
-        formData.append('search_term', searchTerm);
-        formData.append('project_id', currentProjectId);
-
-        // Send search request
-        fetch('search_personnel.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            const resultsDiv = document.getElementById('personnelSearchResults');
-            resultsDiv.innerHTML = ''; // Clear previous results
-
-            if (data.success && data.personnel.length > 0) {
-                const ul = document.createElement('ul');
-                ul.className = 'list-group mt-2';
-
-                data.personnel.forEach(person => {
-                    const li = document.createElement('li');
-                    li.className = 'list-group-item d-flex justify-content-between align-items-center';
-                    li.innerHTML = `
-                        <div>
-                            <strong>${person.name}</strong>
-                            <br>
-                            <small class="text-muted">${person.email}</small>
-                        </div>
-                        <button class="btn btn-sm btn-primary" onclick="assignPersonnel(${person.user_id})">
-                            <i class="fas fa-plus"></i> Add
-                        </button>
-                    `;
-                    ul.appendChild(li);
-                });
-
-                resultsDiv.appendChild(ul);
-            } else {
-                resultsDiv.innerHTML = `
-                    <div class="alert alert-info mt-2">
-                        <i class="fas fa-info-circle me-2"></i>
-                        No personnel found matching "${searchTerm}"
-                    </div>
-                `;
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Failed to search personnel');
-        });
-    }
-
-    function assignPersonnel(userId) {
-        if (!currentProjectId || !userId) {
-            alert('Missing required information');
-            return;
-        }
-
-        // Create FormData object
-        const formData = new FormData();
-        formData.append('project_id', currentProjectId);
-        formData.append('personnel', JSON.stringify([userId]));
-
-        // Send request to assign personnel
-        fetch('assign_additional_personnel.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Clear search
-                document.getElementById('personnelSearchInput').value = '';
-                document.getElementById('personnelSearchResults').innerHTML = '';
-                document.getElementById('personnelSearchForm').style.display = 'none';
-                document.getElementById('searchSuggestions').classList.add('d-none');
-                
-                // Refresh the project details
-                alert('Personnel assigned successfully!');
-                location.reload();
-            } else {
-                alert(data.message || 'Failed to assign personnel');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Failed to assign personnel');
-        });
-    }
-
-    // Add event listener for search input
-    document.addEventListener('DOMContentLoaded', function() {
-        const searchInput = document.getElementById('personnelSearchInput');
-        searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                searchPersonnel();
-            }
-        });
-    });
 
     function completeProject() {
         if (!currentProjectId) {
@@ -1236,5 +911,4 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     </script>
 </body>
-</html> 
 </html> 

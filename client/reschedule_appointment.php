@@ -16,6 +16,22 @@ if (!isset($_POST['appointment_id']) || !isset($_POST['new_date']) || !isset($_P
     exit;
 }
 
+// Add after your existing checks
+if (!isset($_POST['pin'])) {
+    echo json_encode(['success' => false, 'message' => 'PIN is required']);
+    exit;
+}
+
+// Verify PIN
+$stmt = $pdo->prepare("SELECT pin_code FROM users WHERE user_id = ?");
+$stmt->execute([$_SESSION['user_id']]);
+$user = $stmt->fetch();
+
+if (!password_verify($_POST['pin'], $user['pin_code'])) {
+    echo json_encode(['success' => false, 'message' => 'Invalid PIN']);
+    exit;
+}
+
 try {
     // Get the appointment to verify ownership and status
     $stmt = $pdo->prepare("SELECT * FROM appointments WHERE appointment_id = ? AND client_id = ?");
@@ -29,6 +45,29 @@ try {
 
     if ($appointment['status'] !== 'pending') {
         echo json_encode(['success' => false, 'message' => 'Only pending appointments can be rescheduled']);
+        exit;
+    }
+
+    // Check if trying to reschedule to the same date and time
+    if ($_POST['new_date'] === $appointment['date'] && $_POST['new_time'] === $appointment['time']) {
+        echo json_encode(['success' => false, 'message' => 'Please select a different time for rescheduling']);
+        exit;
+    }
+
+    // Check if the time slot is already booked by another appointment
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) 
+        FROM appointments 
+        WHERE date = ? 
+        AND time = ? 
+        AND appointment_id != ? 
+        AND status != 'cancelled'
+    ");
+    $stmt->execute([$_POST['new_date'], $_POST['new_time'], $_POST['appointment_id']]);
+    $exists = $stmt->fetchColumn();
+
+    if ($exists > 0) {
+        echo json_encode(['success' => false, 'message' => 'This time slot is already booked']);
         exit;
     }
 

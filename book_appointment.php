@@ -43,6 +43,18 @@ $services = [
         'Preventive Maintenance and other mechanical works'
     ]
 ];
+
+// Function to get booked time slots for a specific date
+function getBookedTimeSlots($pdo, $date) {
+    $stmt = $pdo->prepare("
+        SELECT TIME_FORMAT(preferred_time, '%H:%i') as booked_time 
+        FROM appointments 
+        WHERE preferred_date = ? 
+        AND status != 'cancelled'
+    ");
+    $stmt->execute([$date]);
+    return $stmt->fetchAll(PDO::FETCH_COLUMN);
+}
 ?>
 
 <!DOCTYPE html>
@@ -63,6 +75,9 @@ $services = [
     
     <!-- AOS CSS -->
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+
+    <!-- Google reCAPTCHA -->
+    <script src="https://www.google.com/recaptcha/api.js?render=6LcVU_wqAAAAANKqzxrZ-qBG1FFxOHhJd97KJSWD"></script>
 </head>
 <body id="appointmentPage">
     
@@ -133,6 +148,9 @@ $services = [
                         <h2 class="text-center mb-4">Book an Appointment</h2>
                         
                         <form id="appointmentForm" method="POST" action="process_appointment.php">
+                            <!-- Add a hidden input for the recaptcha token -->
+                            <input type="hidden" name="recaptcha_token" id="recaptcha_token">
+                            
                             <!-- Service Selection -->
                             <div class="mb-5">
                                 <h2 class="text-center mb-4">Our Services</h2>
@@ -165,7 +183,7 @@ $services = [
                                                                     <div class="form-check">
                                                                         <input class="form-check-input service-checkbox" 
                                                                                type="checkbox"
-                                                                               name="services[]" 
+                                                                               name="service[]" 
                                                                                value="<?php echo htmlspecialchars($category . ': ' . $service); ?>"
                                                                                id="service-<?php echo $category . '-' . $index; ?>"
                                                                                data-service-name="<?php echo htmlspecialchars($service); ?>">
@@ -207,7 +225,9 @@ $services = [
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Preferred Time</label>
-                                    <input type="time" class="form-control" name="time" required>
+                                    <select class="form-control" name="time" required>
+                                        <option value="">Select a date first</option>
+                                    </select>
                                 </div>
                             </div>
 
@@ -237,11 +257,90 @@ $services = [
     document.addEventListener('DOMContentLoaded', function() {
         // Date restrictions
         const dateInput = document.querySelector('input[name="date"]');
-        if (dateInput) {
+        const timeSelect = document.querySelector('select[name="time"]');
+        
+        if (dateInput && timeSelect) {
             // Set min date to today
             dateInput.min = new Date().toISOString().split('T')[0];
             
-            // Add event listener to validate weekdays
+            // Function to update available time slots
+            function updateAvailableTimeSlots() {
+                const selectedDate = dateInput.value;
+                if (!selectedDate) return;
+                
+                // Clear existing options
+                timeSelect.innerHTML = '<option value="">Select a time</option>';
+                
+                // Add time options from 8:30 AM to 4:30 PM
+                for (let hour = 8; hour <= 16; hour++) {
+                    let startMinute = hour === 8 ? 30 : 0;
+                    let endMinute = hour === 16 ? 30 : 60;
+                    
+                    for (let minute = startMinute; minute < endMinute; minute += 30) {
+                        const currentTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                        const nextTime = minute === 30 ? 
+                            `${(hour + 1).toString().padStart(2, '0')}:00` : 
+                            `${hour.toString().padStart(2, '0')}:30`;
+                            
+                        const timeDisplay = formatTimeRange(currentTime, nextTime);
+                        const option = document.createElement('option');
+                        option.value = currentTime;
+                        option.text = timeDisplay;
+                        timeSelect.appendChild(option);
+                    }
+                }
+
+                // Check for booked slots after populating times
+                checkBookedTimeSlots(selectedDate);
+            }
+
+            // Function to format time display
+            function formatTimeRange(start, end) {
+                function formatTime(time) {
+                    const [hours, minutes] = time.split(':');
+                    const hour = parseInt(hours);
+                    const period = hour >= 12 ? 'PM' : 'AM';
+                    const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+                    return `${displayHour}:${minutes}${period}`;
+                }
+                return `${formatTime(start)} - ${formatTime(end)}`;
+            }
+
+            // Function to check booked time slots
+            async function checkBookedTimeSlots(date) {
+                try {
+                    const response = await fetch('check_available_times.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ date: date })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success && data.bookedTimes) {
+                        // Disable booked time slots
+                        Array.from(timeSelect.options).forEach(option => {
+                            if (data.bookedTimes.includes(option.value)) {
+                                option.disabled = true;
+                                option.classList.add('text-muted');
+                                // Check if "(Booked)" is not already added
+                                if (!option.text.includes('(Booked)')) {
+                                    option.text += ' (Booked)';
+                                }
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error checking booked times:', error);
+                }
+            }
+
+            // Update time slots when date changes
+            dateInput.addEventListener('change', updateAvailableTimeSlots);
+            
+            // Add weekday validation
             dateInput.addEventListener('input', function() {
                 const selected = new Date(this.value);
                 const day = selected.getDay();
@@ -249,48 +348,44 @@ $services = [
                 if (day === 0 || day === 6) { // 0 is Sunday, 6 is Saturday
                     alert('Please select a date between Monday and Friday');
                     this.value = '';
+                    timeSelect.innerHTML = '<option value="">Select a date first</option>';
+                } else {
+                    updateAvailableTimeSlots();
                 }
             });
         }
+    });
+    </script>
 
-        // Time restrictions
-        const timeInput = document.querySelector('input[name="time"]');
-        if (timeInput) {
-            const timeSelect = document.createElement('select');
-            timeSelect.className = 'form-select';
-            timeSelect.name = 'time';
-            timeSelect.required = true;
-
-            function formatTimeOption(hour, minute) {
-                const period = hour >= 12 ? 'PM' : 'AM';
-                const displayHour = hour > 12 ? hour - 12 : hour;
-                return {
-                    value: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
-                    text: `${displayHour}:${minute.toString().padStart(2, '0')}${period}`
-                };
-            }
-
-            // Add time options from 9 AM to 3 PM with 30-minute intervals
-            for (let hour = 9; hour <= 15; hour++) {
-                for (let minute = 0; minute < 60; minute += 30) {
-                    // Skip times after 3:00 PM
-                    if (hour === 15 && minute > 0) continue;
-                    
-                    const time = formatTimeOption(hour, minute);
-                    const nextTime = minute === 30 ? 
-                        formatTimeOption(hour + 1, 0) : 
-                        formatTimeOption(hour, 30);
-                    
-                    const option = document.createElement('option');
-                    option.value = time.value;
-                    option.text = `${time.text} - ${nextTime.text}`;
-                    timeSelect.appendChild(option);
-                }
-            }
-
-            // Replace the time input with the select
-            timeInput.parentNode.replaceChild(timeSelect, timeInput);
-        }
+    <!-- Add this JavaScript before the closing </body> tag -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('appointmentForm');
+        
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Add loading indicator
+            const submitButton = form.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+            submitButton.disabled = true;
+            
+            grecaptcha.ready(function() {
+                grecaptcha.execute('6LcVU_wqAAAAANKqzxrZ-qBG1FFxOHhJd97KJSWD', {action: 'submit'})
+                .then(function(token) {
+                    document.getElementById('recaptcha_token').value = token;
+                    console.log('reCAPTCHA token generated:', token.substring(0, 20) + '...');
+                    form.submit();
+                })
+                .catch(function(error) {
+                    console.error('reCAPTCHA error:', error);
+                    submitButton.innerHTML = originalText;
+                    submitButton.disabled = false;
+                    alert('Error verifying reCAPTCHA. Please try again.');
+                });
+            });
+        });
     });
     </script>
 </body>

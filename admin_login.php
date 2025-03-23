@@ -40,12 +40,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     error_log('POST request received');
     error_log('POST data: ' . print_r($_POST, true));
     
-    $email = $_POST['email'] ?? '';
-    $password = $_POST['password'] ?? '';
-    
-    error_log("Attempting login for email: $email");
-    
     try {
+        // Verify reCAPTCHA first
+        $recaptcha_token = $_POST['recaptcha_token'] ?? '';
+        if (empty($recaptcha_token)) {
+            throw new Exception('reCAPTCHA verification failed');
+        }
+
+        // Verify the token with Google
+        $recaptcha_url = 'https://www.google.com/recaptcha/api/siteverify';
+        $recaptcha_secret = '6LcVU_wqAAAAAKp4DJS_cEa4RecUQ8M4ECERbXPy';
+        
+        $recaptcha_response = file_get_contents($recaptcha_url . '?secret=' . $recaptcha_secret . '&response=' . $recaptcha_token);
+        $recaptcha_data = json_decode($recaptcha_response);
+
+        // Check if verification was successful and score is acceptable
+        if (!$recaptcha_data->success || $recaptcha_data->score < 0.5) {
+            throw new Exception('reCAPTCHA verification failed. Please try again.');
+        }
+
+        $email = $_POST['email'] ?? '';
+        $password = $_POST['password'] ?? '';
+        
+        error_log("Attempting login for email: $email");
+        
         $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND status = 'active' AND role != 'client'");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -94,9 +112,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             error_log("Login failed - Invalid credentials");
             $error_message = 'Invalid email or password';
         }
-    } catch(PDOException $e) {
-        error_log("Database error: " . $e->getMessage());
-        $error_message = 'Login error: ' . $e->getMessage();
+    } catch(Exception $e) {
+        $error_message = $e->getMessage();
+        error_log("Admin login error: " . $e->getMessage());
     }
 }
 ?>
@@ -129,6 +147,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
 
+    <!-- Add reCAPTCHA script -->
+    <script src="https://www.google.com/recaptcha/api.js?render=6LcVU_wqAAAAANKqzxrZ-qBG1FFxOHhJd97KJSWD"></script>
 </head>
 <body id="adminLoginPage">
     <?php include 'header.php'; ?>
@@ -148,6 +168,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?php endif; ?>
 
                         <form method="POST" action="admin_login.php" id="loginForm">
+                            <!-- Add hidden input for recaptcha token -->
+                            <input type="hidden" name="recaptcha_token" id="recaptcha_token">
+                            
                             <div class="form-floating mb-4">
                                 <input type="email" class="form-control" id="email" name="email" placeholder="Email" required>
                                 <label for="email"><i class="fas fa-envelope me-2"></i>Email Address</label>
@@ -174,9 +197,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <?php include 'footer.php'; ?>
+
+    <!-- Add reCAPTCHA handling script -->
     <script>
-    document.getElementById('loginForm').addEventListener('submit', function(e) {
-        console.log('Form submitted');
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('loginForm');
+        
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Add loading indicator
+            const submitButton = form.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
+            submitButton.disabled = true;
+            
+            grecaptcha.ready(function() {
+                grecaptcha.execute('6LcVU_wqAAAAANKqzxrZ-qBG1FFxOHhJd97KJSWD', {action: 'submit'})
+                .then(function(token) {
+                    document.getElementById('recaptcha_token').value = token;
+                    form.submit();
+                })
+                .catch(function(error) {
+                    submitButton.innerHTML = originalText;
+                    submitButton.disabled = false;
+                    alert('Error verifying request. Please try again.');
+                });
+            });
+        });
     });
     </script>
 </body>

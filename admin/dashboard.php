@@ -318,5 +318,91 @@ $recent_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
     </div>
+
+    <!-- Add this JavaScript before the closing </body> tag -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // ... existing PIN input setup code ...
+
+        if (verifyPinBtn) {
+            verifyPinBtn.addEventListener('click', function() {
+                const pinInputs = document.querySelectorAll('#pinVerificationModal .pin-input');
+                const pin = Array.from(pinInputs).map(input => input.value).join('');
+                
+                if (pin.length !== 4) {
+                    document.getElementById('pinError').style.display = 'block';
+                    return;
+                }
+                
+                fetch('../api/auth/verify_pin.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ pin })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Hide the modal properly
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('pinVerificationModal'));
+                        modal.hide();
+                        
+                        // Clean up modal artifacts
+                        document.querySelector('.modal-backdrop').remove();
+                        document.body.classList.remove('modal-open');
+                        document.body.style.removeProperty('padding-right');
+                        document.body.style.removeProperty('overflow');
+                        
+                        // Show the main content
+                        document.querySelector('.admin-main-content').style.display = 'block';
+                        
+                        // Refresh the page to ensure everything is properly loaded
+                        window.location.reload();
+                    } else {
+                        document.getElementById('pinError').textContent = data.message || 'Invalid PIN. Please try again.';
+                        document.getElementById('pinError').style.display = 'block';
+                        
+                        if (data.lockout_duration) {
+                            // Disable the verify button and show countdown
+                            verifyPinBtn.disabled = true;
+                            startLockoutCountdown(data.lockout_duration);
+                        }
+                        
+                        pinInputs.forEach(input => input.value = '');
+                        pinInputs[0].focus();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('pinError').textContent = 'An error occurred. Please try again.';
+                    document.getElementById('pinError').style.display = 'block';
+                });
+            });
+        }
+
+        function startLockoutCountdown(duration) {
+            const verifyBtn = document.getElementById('verifyPinBtn');
+            const errorDiv = document.getElementById('pinError');
+            let timeLeft = duration;
+
+            const countdownInterval = setInterval(() => {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                errorDiv.textContent = `Account locked. Please try again in ${minutes}:${seconds.toString().padStart(2, '0')} minutes`;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    verifyBtn.disabled = false;
+                    errorDiv.textContent = 'You can now try again.';
+                    setTimeout(() => {
+                        errorDiv.style.display = 'none';
+                    }, 3000);
+                }
+                timeLeft--;
+            }, 1000);
+        }
+    });
+    </script>
 </body>
 </html> 

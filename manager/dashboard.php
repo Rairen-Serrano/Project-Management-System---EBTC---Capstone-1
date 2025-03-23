@@ -202,7 +202,7 @@ $team_workload = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <!-- Statistics Cards -->
             <div class="row g-4 mb-4">
                 <!-- Project Statistics -->
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <div class="card stat-card h-100 border-primary border-opacity-25">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
@@ -229,7 +229,7 @@ $team_workload = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
 
                 <!-- Team Statistics -->
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <div class="card stat-card h-100 border-success border-opacity-25">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
@@ -246,52 +246,50 @@ $team_workload = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <i class="fas fa-user-tie"></i>
                                     <?php echo $team_stats['engineers']; ?> Engineers
                                 </span>
-                                <span>
+                                <span class="me-2">
                                     <i class="fas fa-user-cog"></i>
                                     <?php echo $team_stats['technicians']; ?> Technicians
+                                </span>
+                                <span>
+                                    <i class="fas fa-hard-hat"></i>
+                                    <?php echo $team_stats['workers']; ?> Workers
                                 </span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Task Statistics -->
-                <div class="col-md-3">
-                    <div class="card stat-card h-100 border-warning border-opacity-25">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="card-title mb-1">Active Tasks</h6>
-                                    <h2 class="mb-0 fw-bold text-warning" id="activeTasks">-</h2>
-                                </div>
-                                <div class="card-icon text-warning">
-                                    <i class="fas fa-tasks fa-2x"></i>
-                                </div>
-                            </div>
-                            <div class="mt-3">
-                                <div class="progress project-progress">
-                                    <div class="progress-bar bg-warning" id="taskProgress" role="progressbar" style="width: 0%"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Deadline Statistics -->
-                <div class="col-md-3">
+                <!-- Upcoming Deadlines -->
+                <div class="col-md-4">
                     <div class="card stat-card h-100 border-info border-opacity-25">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="card-title mb-1">Upcoming Deadlines</h6>
-                                    <h2 class="mb-0 fw-bold text-info" id="upcomingDeadlines">-</h2>
+                                    <?php
+                                    // Get nearest project deadline
+                                    $stmt = $pdo->prepare("
+                                        SELECT COUNT(*) as upcoming_count, MIN(end_date) as next_deadline
+                                        FROM projects 
+                                        WHERE status = 'ongoing' 
+                                        AND end_date >= CURDATE()
+                                    ");
+                                    $stmt->execute();
+                                    $deadline_stats = $stmt->fetch(PDO::FETCH_ASSOC);
+                                    ?>
+                                    <h2 class="mb-0 fw-bold text-info"><?php echo $deadline_stats['upcoming_count']; ?></h2>
                                 </div>
                                 <div class="card-icon text-info">
                                     <i class="fas fa-calendar-alt fa-2x"></i>
                                 </div>
                             </div>
-                            <div class="mt-3 small" id="nextDeadline">
-                                Loading next deadline...
+                            <div class="mt-3 small">
+                                <?php if ($deadline_stats['next_deadline']): ?>
+                                    <i class="fas fa-clock text-info me-1"></i>
+                                    Next: <?php echo date('M d, Y', strtotime($deadline_stats['next_deadline'])); ?>
+                                <?php else: ?>
+                                    <span class="text-muted">No upcoming deadlines</span>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -673,7 +671,7 @@ $team_workload = $stmt->fetchAll(PDO::FETCH_ASSOC);
     });
 
     // Handle PIN verification
-    document.getElementById('verifyPinBtn').addEventListener('click', async function() {
+    document.getElementById('verifyPinBtn').addEventListener('click', function() {
         const pinInputs = document.querySelectorAll('#pinVerificationModal .pin-input');
         const pin = Array.from(pinInputs).map(input => input.value).join('');
         
@@ -682,32 +680,73 @@ $team_workload = $stmt->fetchAll(PDO::FETCH_ASSOC);
             return;
         }
         
-        try {
-            const response = await fetch('../api/auth/verify_pin.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ pin })
-            });
-
-            const data = await response.json();
-
+        fetch('../api/auth/verify_pin.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ pin })
+        })
+        .then(response => response.json())
+        .then(data => {
             if (data.success) {
+                // Hide the modal properly
                 const modal = bootstrap.Modal.getInstance(document.getElementById('pinVerificationModal'));
                 modal.hide();
-                location.reload();
+                
+                // Clean up modal artifacts
+                document.querySelector('.modal-backdrop').remove();
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+                
+                // Show the main content
+                document.querySelector('.manager-main-content').style.display = 'block';
+                
+                // Refresh the page to ensure everything is properly loaded
+                window.location.reload();
             } else {
+                document.getElementById('pinError').textContent = data.message || 'Invalid PIN. Please try again.';
                 document.getElementById('pinError').style.display = 'block';
+                
+                if (data.lockout_duration) {
+                    // Disable the verify button and show countdown
+                    verifyPinBtn.disabled = true;
+                    startLockoutCountdown(data.lockout_duration);
+                }
+                
                 pinInputs.forEach(input => input.value = '');
                 pinInputs[0].focus();
             }
-        } catch (error) {
+        })
+        .catch(error => {
             console.error('Error:', error);
             document.getElementById('pinError').textContent = 'An error occurred. Please try again.';
             document.getElementById('pinError').style.display = 'block';
-        }
+        });
     });
+
+    function startLockoutCountdown(duration) {
+        const verifyBtn = document.getElementById('verifyPinBtn');
+        const errorDiv = document.getElementById('pinError');
+        let timeLeft = duration;
+
+        const countdownInterval = setInterval(() => {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            errorDiv.textContent = `Account locked. Please try again in ${minutes}:${seconds.toString().padStart(2, '0')} minutes`;
+            
+            if (timeLeft <= 0) {
+                clearInterval(countdownInterval);
+                verifyBtn.disabled = false;
+                errorDiv.textContent = 'You can now try again.';
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 3000);
+            }
+            timeLeft--;
+        }, 1000);
+    }
 
     // Handle PIN setup
     document.getElementById('savePinBtn')?.addEventListener('click', async function() {

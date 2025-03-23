@@ -70,6 +70,9 @@ function sendVerificationEmail($user, $verification_code) {
     }
 }
 
+// Debugging
+error_log('Login process started');
+
 // Handle verification code submission
 if (isset($_POST['verify_code'])) {
     $code = $_POST['verification_code'];
@@ -90,6 +93,7 @@ if (isset($_POST['verify_code'])) {
             $stmt->execute([$user_id]);
             $user = $stmt->fetch();
             
+            // Set essential session variables
             $_SESSION['logged_in'] = true;
             $_SESSION['user_id'] = $user['user_id'];
             $_SESSION['name'] = $user['name'];
@@ -103,46 +107,79 @@ if (isset($_POST['verify_code'])) {
             unset($_SESSION['temp_user_id']);
             unset($_SESSION['verification_required']);
             
-            header('Location: client/dashboard.php');
+            // Redirect based on role
+            if ($user['role'] === 'client') {
+                header('Location: client/dashboard.php');
+            } else {
+                header('Location: admin_login.php');
+            }
             exit;
         } else {
             $error_message = 'Invalid or expired verification code';
         }
     } catch(PDOException $e) {
-        $error_message = 'Verification error: ' . $e->getMessage();
+        error_log("Login error: " . $e->getMessage());
+        $error_message = 'Login error occurred';
     }
 }
 
-// Handle login form submission
+// Add reCAPTCHA verification at the top where other POST processing happens
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_code'])) {
-    $email = $_POST['email'] ?? '';
-    $password = $_POST['password'] ?? '';
-    
     try {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND status = 'active'");
+        // Verify reCAPTCHA first
+        $recaptcha_token = $_POST['recaptcha_token'] ?? '';
+        if (empty($recaptcha_token)) {
+            throw new Exception('reCAPTCHA verification failed');
+        }
+
+        // Verify the token with Google
+        $recaptcha_url = 'https://www.google.com/recaptcha/api/siteverify';
+        $recaptcha_secret = '6LcVU_wqAAAAAKp4DJS_cEa4RecUQ8M4ECERbXPy';
+        
+        $recaptcha_response = file_get_contents($recaptcha_url . '?secret=' . $recaptcha_secret . '&response=' . $recaptcha_token);
+        $recaptcha_data = json_decode($recaptcha_response);
+
+        // Check if verification was successful and score is acceptable
+        if (!$recaptcha_data->success || $recaptcha_data->score < 0.5) {
+            throw new Exception('reCAPTCHA verification failed. Please try again.');
+        }
+
+        // Handle initial login attempt
+        $email = $_POST['email'] ?? '';
+        $password = $_POST['password'] ?? '';
+        
+        // Check if user exists and their email is verified
+        $stmt = $pdo->prepare("
+            SELECT user_id, name, email, password, role, status
+            FROM users 
+            WHERE email = ? AND role = 'client'
+        ");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
         
         if ($user && password_verify($password, $user['password'])) {
-            if ($user['role'] !== 'client') {
-                $error_message = 'Please use the admin login page';
+            // Check if email is verified (status is active)
+            if ($user['status'] === 'pending') {
+                $error_message = 'Please verify your email address before logging in. 
+                                Check your email for the verification link or 
+                                <a href="resend_verification.php?email=' . urlencode($email) . '">click here</a> 
+                                to resend the verification email.';
             } else {
-                try {
-                    $verification_code = generateAndSaveVerificationCode($pdo, $user['user_id']);
-                    sendVerificationEmail($user, $verification_code);
-                    
-                    // Store user_id temporarily and set verification flag
-                    $_SESSION['temp_user_id'] = $user['user_id'];
-                    $_SESSION['verification_required'] = true;
-                } catch (Exception $e) {
-                    $error_message = $e->getMessage();
-                }
+                $_SESSION['temp_user_id'] = $user['user_id'];
+                $_SESSION['verification_required'] = true;
+                
+                // Generate and send verification code
+                $verification_code = generateAndSaveVerificationCode($pdo, $user['user_id']);
+                sendVerificationEmail($user, $verification_code);
+                
+                $success_message = 'Verification code sent to your email.';
             }
         } else {
             $error_message = 'Invalid email or password';
         }
     } catch(PDOException $e) {
-        $error_message = 'Login error: ' . $e->getMessage();
+        error_log("Login attempt error: " . $e->getMessage());
+        $error_message = 'Login error occurred';
     }
 }
 
@@ -205,6 +242,8 @@ if (isset($_POST['return_login'])) {
 
     <title>Landing Page | Login Page</title>
     
+    <!-- Add reCAPTCHA script -->
+    <script src="https://www.google.com/recaptcha/api.js?render=6LcVU_wqAAAAANKqzxrZ-qBG1FFxOHhJd97KJSWD"></script>
 </head>
 <body id="loginPage">
     <?php include 'header.php'; ?>
@@ -274,8 +313,11 @@ if (isset($_POST['return_login'])) {
                                 </div>
                             <?php endif; ?>
 
-                            <!-- Your existing login form -->
-                            <form method="POST" action="">
+                            <!-- Modified login form with reCAPTCHA -->
+                            <form method="POST" action="" id="loginForm">
+                                <!-- Add hidden input for recaptcha token -->
+                                <input type="hidden" name="recaptcha_token" id="recaptcha_token">
+                                
                                 <div class="form-floating mb-4">
                                     <input type="email" class="form-control" id="email" name="email" placeholder="Email" required>
                                     <label for="email"><i class="fas fa-envelope me-2"></i>Email Address</label>
@@ -304,5 +346,158 @@ if (isset($_POST['return_login'])) {
     </div>
 
     <?php include 'footer.php'; ?>
+
+    <!-- Add reCAPTCHA handling script -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('loginForm');
+        
+        if (form) { // Only add listener if login form exists (not verification form)
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Add loading indicator
+                const submitButton = form.querySelector('button[type="submit"]');
+                const originalText = submitButton.innerHTML;
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
+                submitButton.disabled = true;
+                
+                grecaptcha.ready(function() {
+                    grecaptcha.execute('6LcVU_wqAAAAANKqzxrZ-qBG1FFxOHhJd97KJSWD', {action: 'submit'})
+                    .then(function(token) {
+                        document.getElementById('recaptcha_token').value = token;
+                        form.submit();
+                    })
+                    .catch(function(error) {
+                        submitButton.innerHTML = originalText;
+                        submitButton.disabled = false;
+                        alert('Error verifying request. Please try again.');
+                    });
+                });
+            });
+        }
+    });
+    </script>
+
+    <!-- Privacy Policy Modal -->
+    <div class="modal fade" id="privacyModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Data Privacy Policy</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Republic Act 10173 – Data Privacy Act of 2012</h6>
+                    <p>This privacy policy is in compliance with Republic Act No. 10173, also known as the Data Privacy Act of 2012, which protects individuals' personal information in information and communications systems.</p>
+
+                    <h6>Collection of Personal Information</h6>
+                    <p>We collect personal information that you voluntarily provide when using our services, including but not limited to:</p>
+                    <ul>
+                        <li>Name</li>
+                        <li>Email address</li>
+                        <li>Phone number</li>
+                        <li>Other information necessary for service delivery</li>
+                    </ul>
+
+                    <h6>Use of Personal Information</h6>
+                    <p>Your personal information will be used for:</p>
+                    <ul>
+                        <li>Providing and improving our services</li>
+                        <li>Communication regarding your appointments and inquiries</li>
+                        <li>Account management and verification</li>
+                        <li>Compliance with legal obligations</li>
+                    </ul>
+
+                    <h6>Protection of Personal Information</h6>
+                    <p>We implement appropriate security measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.</p>
+
+                    <h6>Your Rights Under the Data Privacy Act</h6>
+                    <p>You have the right to:</p>
+                    <ul>
+                        <li>Be informed about the collection and use of your personal data</li>
+                        <li>Access your personal information</li>
+                        <li>Object to the processing of your personal data</li>
+                        <li>Rectify inaccurate or incorrect personal data</li>
+                        <li>Remove or withdraw your personal information</li>
+                        <li>Be indemnified for damages due to inaccurate information</li>
+                        <li>Data portability</li>
+                    </ul>
+
+                    <h6>Contact Information</h6>
+                    <p>For any concerns regarding your personal data, please contact our Data Protection Officer at [contact information].</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Terms and Conditions Modal -->
+    <div class="modal fade" id="termsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Terms and Conditions</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>1. Acceptance of Terms</h6>
+                    <p>By accessing and using this service, you accept and agree to be bound by the terms and conditions of this agreement.</p>
+
+                    <h6>2. User Account Responsibilities</h6>
+                    <ul>
+                        <li>You are responsible for maintaining the confidentiality of your account credentials</li>
+                        <li>You agree to provide accurate and complete information</li>
+                        <li>You must notify us immediately of any unauthorized use of your account</li>
+                    </ul>
+
+                    <h6>3. Service Usage</h6>
+                    <ul>
+                        <li>Services must be used for lawful purposes only</li>
+                        <li>Appointments must be canceled at least 24 hours in advance</li>
+                        <li>Users must provide accurate information for appointments</li>
+                    </ul>
+
+                    <h6>4. Intellectual Property</h6>
+                    <p>All content and materials available through our service are protected by intellectual property rights.</p>
+
+                    <h6>5. Limitation of Liability</h6>
+                    <p>We shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of our services.</p>
+
+                    <h6>6. Modifications to Service</h6>
+                    <p>We reserve the right to modify or discontinue the service at any time without notice.</p>
+
+                    <h6>7. Governing Law</h6>
+                    <p>These terms shall be governed by and construed in accordance with the laws of the Philippines.</p>
+
+                    <h6>8. Contact Information</h6>
+                    <p>For any questions regarding these terms, please contact us at [contact information].</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add this to your existing script section -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('loginForm');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const agreeTerms = document.getElementById('agreeTerms');
+                if (!agreeTerms.checked) {
+                    e.preventDefault();
+                    alert('Please agree to the Terms and Conditions and Data Privacy Policy to continue.');
+                    return false;
+                }
+                // ... rest of your existing login form submission code ...
+            });
+        }
+    });
+    </script>
 </body>
 </html>

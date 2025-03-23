@@ -2,6 +2,9 @@
 session_start();
 require_once '../dbconnect.php';
 
+// Add this near the top of the file, after session_start()
+error_log('Engineer Dashboard Load - Session Data: ' . print_r($_SESSION, true));
+
 // Check if user is logged in and is an engineer
 if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'engineer') {
     // Clear session and redirect to login
@@ -148,7 +151,6 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                                             <th>Assigned Date</th>
                                             <th>Due Date</th>
                                             <th>Status</th>
-                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -176,10 +178,10 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
 
                                         foreach ($tasks as $task) {
                                             // Determine status class
-                                            $statusClass = match($task['status']) {
-                                                'Completed' => 'bg-success',
-                                                'In Progress' => 'bg-primary',
-                                                'Pending' => 'bg-warning',
+                                            $statusClass = match(strtolower($task['status'])) {
+                                                'completed' => 'bg-success',
+                                                'in_progress' => 'bg-primary',
+                                                'pending' => 'bg-warning',
                                                 default => 'bg-secondary'
                                             };
 
@@ -216,30 +218,6 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                                                         <?php echo $task['status']; ?>
                                                     </span>
                                                 </td>
-                                                <td>
-                                                    <div class="dropdown">
-                                                        <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
-                                                            <i class="fas fa-ellipsis-v"></i>
-                                                        </button>
-                                                        <ul class="dropdown-menu">
-                                                            <li>
-                                                                <a class="dropdown-item" href="task_details.php?id=<?php echo $task['task_id']; ?>">
-                                                                    <i class="fas fa-eye me-2"></i>View Details
-                                                                </a>
-                                                            </li>
-                                                            <li>
-                                                                <a class="dropdown-item" href="update_task.php?id=<?php echo $task['task_id']; ?>">
-                                                                    <i class="fas fa-edit me-2"></i>Update Progress
-                                                                </a>
-                                                            </li>
-                                                            <li>
-                                                                <a class="dropdown-item" href="#" onclick="addTaskNote(<?php echo $task['task_id']; ?>)">
-                                                                    <i class="fas fa-comment me-2"></i>Add Note
-                                                                </a>
-                                                            </li>
-                                                        </ul>
-                                                    </div>
-                                                </td>
                                             </tr>
                                         <?php } ?>
                                     </tbody>
@@ -253,33 +231,6 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- PIN Verification Modal -->
-    <div class="modal fade" id="pinVerificationModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Engineer PIN Verification</h5>
-                </div>
-                <div class="modal-body">
-                    <p class="text-center mb-4">Please enter your 4-digit PIN code to access the dashboard.</p>
-                    <div class="pin-input-group">
-                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
-                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
-                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
-                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
-                    </div>
-                    <div id="pinError" class="text-danger text-center mt-2" style="display: none;">
-                        Invalid PIN. Please try again.
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" id="verifyPinBtn">Verify PIN</button>
-                    <a href="../logout.php" class="btn btn-secondary">Logout</a>
                 </div>
             </div>
         </div>
@@ -300,20 +251,20 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                     <form id="pinSetupForm">
                         <div class="mb-4">
                             <label class="form-label">Enter New PIN</label>
-                            <div class="pin-input-group">
-                                <input type="password" class="pin-input setup-pin" maxlength="1" pattern="[0-9]" required>
-                                <input type="password" class="pin-input setup-pin" maxlength="1" pattern="[0-9]" required>
-                                <input type="password" class="pin-input setup-pin" maxlength="1" pattern="[0-9]" required>
-                                <input type="password" class="pin-input setup-pin" maxlength="1" pattern="[0-9]" required>
+                            <div class="d-flex justify-content-center gap-2">
+                                <input type="password" class="form-control pin-input setup-pin text-center" maxlength="1" pattern="[0-9]" required>
+                                <input type="password" class="form-control pin-input setup-pin text-center" maxlength="1" pattern="[0-9]" required>
+                                <input type="password" class="form-control pin-input setup-pin text-center" maxlength="1" pattern="[0-9]" required>
+                                <input type="password" class="form-control pin-input setup-pin text-center" maxlength="1" pattern="[0-9]" required>
                             </div>
                         </div>
                         <div class="mb-4">
                             <label class="form-label">Confirm PIN</label>
-                            <div class="pin-input-group">
-                                <input type="password" class="pin-input confirm-pin" maxlength="1" pattern="[0-9]" required>
-                                <input type="password" class="pin-input confirm-pin" maxlength="1" pattern="[0-9]" required>
-                                <input type="password" class="pin-input confirm-pin" maxlength="1" pattern="[0-9]" required>
-                                <input type="password" class="pin-input confirm-pin" maxlength="1" pattern="[0-9]" required>
+                            <div class="d-flex justify-content-center gap-2">
+                                <input type="password" class="form-control pin-input confirm-pin text-center" maxlength="1" pattern="[0-9]" required>
+                                <input type="password" class="form-control pin-input confirm-pin text-center" maxlength="1" pattern="[0-9]" required>
+                                <input type="password" class="form-control pin-input confirm-pin text-center" maxlength="1" pattern="[0-9]" required>
+                                <input type="password" class="form-control pin-input confirm-pin text-center" maxlength="1" pattern="[0-9]" required>
                             </div>
                         </div>
                         <div id="pinSetupError" class="text-danger text-center mt-2" style="display: none;"></div>
@@ -321,6 +272,33 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-primary" id="savePinBtn">Save PIN</button>
+                    <a href="../logout.php" class="btn btn-secondary">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PIN Verification Modal -->
+    <div class="modal fade" id="pinVerificationModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Engineer PIN Verification</h5>
+                </div>
+                <div class="modal-body">
+                    <p class="text-center mb-4">Please enter your 4-digit PIN code to access the dashboard.</p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <input type="password" class="form-control pin-input text-center" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="form-control pin-input text-center" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="form-control pin-input text-center" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="form-control pin-input text-center" maxlength="1" pattern="[0-9]" required>
+                    </div>
+                    <div id="pinError" class="text-danger text-center mt-2" style="display: none;">
+                        Invalid PIN. Please try again.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="verifyPinBtn">Verify PIN</button>
                     <a href="../logout.php" class="btn btn-secondary">Logout</a>
                 </div>
             </div>
@@ -360,6 +338,23 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
         background: white;
         z-index: 1;
     }
+
+    .pin-input {
+        width: 50px !important;
+        height: 50px;
+        font-size: 24px;
+        border-radius: 8px;
+    }
+
+    .pin-input:focus {
+        border-color: #235347;
+        box-shadow: 0 0 0 0.2rem rgba(35, 83, 71, 0.25);
+    }
+
+    .pin-input-group {
+        max-width: 300px;
+        margin: 0 auto;
+    }
     </style>
 
     <script>
@@ -375,59 +370,116 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
             const pinSetupModal = new bootstrap.Modal(document.getElementById('pinSetupModal'));
             pinSetupModal.show();
         } else if (!<?php echo isset($_SESSION['pin_verified']) ? 'true' : 'false'; ?>) {
+            // Remove any existing event listeners
+            const oldVerifyBtn = document.getElementById('verifyPinBtn');
+            if (oldVerifyBtn) {
+                const newVerifyBtn = oldVerifyBtn.cloneNode(true);
+                oldVerifyBtn.parentNode.replaceChild(newVerifyBtn, oldVerifyBtn);
+            }
+
+            // Show verification modal
             const pinVerificationModal = new bootstrap.Modal(document.getElementById('pinVerificationModal'));
             pinVerificationModal.show();
+
+            // Add single event listener
+            const verifyPinBtn = document.getElementById('verifyPinBtn');
+            let isVerifying = false; // Flag to prevent multiple submissions
+
+            if (verifyPinBtn) {
+                verifyPinBtn.addEventListener('click', function verifyPin() {
+                    // Prevent multiple submissions
+                    if (isVerifying) return;
+                    isVerifying = true;
+
+                    const pinInputs = document.querySelectorAll('#pinVerificationModal .pin-input');
+                    const pin = Array.from(pinInputs).map(input => input.value).join('');
+                    const errorElement = document.getElementById('pinError');
+                    
+                    if (pin.length !== 4) {
+                        errorElement.textContent = 'Please enter a 4-digit PIN';
+                        errorElement.style.display = 'block';
+                        isVerifying = false;
+                        return;
+                    }
+
+                    console.log('Sending PIN verification request...'); // Debug log
+                    
+                    fetch('../api/auth/verify_pin.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ pin }),
+                        credentials: 'same-origin' // Include cookies
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Verification response:', data); // Debug log
+                        
+                        if (data.success) {
+                            // Remove the event listener to prevent multiple calls
+                            verifyPinBtn.removeEventListener('click', verifyPin);
+                            
+                            // Hide the modal
+                            const modal = bootstrap.Modal.getInstance(document.getElementById('pinVerificationModal'));
+                            modal.hide();
+                            
+                            // Clean up
+                            if (document.querySelector('.modal-backdrop')) {
+                                document.querySelector('.modal-backdrop').remove();
+                            }
+                            document.body.classList.remove('modal-open');
+                            document.body.style.removeProperty('padding-right');
+                            document.body.style.removeProperty('overflow');
+                            
+                            // Show main content and reload
+                            document.querySelector('.engineer-main-content').style.display = 'block';
+                            window.location.reload();
+                        } else {
+                            errorElement.textContent = data.message || 'Invalid PIN. Please try again.';
+                            errorElement.style.display = 'block';
+                            
+                            if (data.lockout_duration) {
+                                verifyPinBtn.disabled = true;
+                                startLockoutCountdown(data.lockout_duration);
+                            }
+                            
+                            pinInputs.forEach(input => input.value = '');
+                            pinInputs[0].focus();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Verification error:', error); // Debug log
+                        errorElement.textContent = 'An error occurred. Please try again.';
+                        errorElement.style.display = 'block';
+                    })
+                    .finally(() => {
+                        isVerifying = false;
+                    });
+                });
+            }
         }
 
-        // Handle PIN verification
-        const verifyPinBtn = document.getElementById('verifyPinBtn');
-        if (verifyPinBtn) {
-            verifyPinBtn.addEventListener('click', function() {
-                const pinInputs = document.querySelectorAll('#pinVerificationModal .pin-input');
-                const pin = Array.from(pinInputs).map(input => input.value).join('');
+        function startLockoutCountdown(duration) {
+            const verifyBtn = document.getElementById('verifyPinBtn');
+            const errorDiv = document.getElementById('pinError');
+            let timeLeft = duration;
+
+            const countdownInterval = setInterval(() => {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                errorDiv.textContent = `Account locked. Please try again in ${minutes}:${seconds.toString().padStart(2, '0')} minutes`;
                 
-                if (pin.length !== 4) {
-                    document.getElementById('pinError').style.display = 'block';
-                    return;
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    verifyBtn.disabled = false;
+                    errorDiv.textContent = 'You can now try again.';
+                    setTimeout(() => {
+                        errorDiv.style.display = 'none';
+                    }, 3000);
                 }
-                
-                fetch('../api/auth/verify_pin.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ pin })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Hide the modal properly
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('pinVerificationModal'));
-                        modal.hide();
-                        
-                        // Clean up modal artifacts
-                        document.querySelector('.modal-backdrop').remove();
-                        document.body.classList.remove('modal-open');
-                        document.body.style.removeProperty('padding-right');
-                        document.body.style.removeProperty('overflow');
-                        
-                        // Show the main content
-                        document.querySelector('.engineer-main-content').style.display = 'block';
-                        
-                        // Refresh the page to ensure everything is properly loaded
-                        window.location.reload();
-                    } else {
-                        document.getElementById('pinError').style.display = 'block';
-                        pinInputs.forEach(input => input.value = '');
-                        pinInputs[0].focus();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('pinError').textContent = 'An error occurred. Please try again.';
-                    document.getElementById('pinError').style.display = 'block';
-                });
-            });
+                timeLeft--;
+            }, 1000);
         }
 
         // Load Dashboard Data
@@ -455,16 +507,16 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
             });
         });
 
-        // Add PIN Input Handling
+        // Function to handle PIN input navigation
         function setupPinInputs(containerSelector) {
-            const container = document.querySelector(containerSelector);
-            if (!container) return;
-
-            const inputs = container.querySelectorAll('.pin-input');
+            const inputs = document.querySelectorAll(`${containerSelector} .pin-input`);
             
             inputs.forEach((input, index) => {
                 // Handle keyup for number input and auto-focus
                 input.addEventListener('keyup', function(e) {
+                    // Allow only numbers
+                    this.value = this.value.replace(/[^0-9]/g, '');
+                    
                     // Move to next input if value is entered
                     if (this.value && index < inputs.length - 1) {
                         inputs[index + 1].focus();
@@ -475,12 +527,34 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                         inputs[index - 1].focus();
                     }
                 });
+
+                // Prevent non-numeric input
+                input.addEventListener('keypress', function(e) {
+                    if (e.key < '0' || e.key > '9') {
+                        e.preventDefault();
+                    }
+                });
+
+                // Handle paste event
+                input.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    const pastedData = e.clipboardData.getData('text').replace(/[^0-9]/g, '').split('');
+                    
+                    inputs.forEach((input, i) => {
+                        if (pastedData[i]) {
+                            input.value = pastedData[i];
+                            if (i < inputs.length - 1) {
+                                inputs[i + 1].focus();
+                            }
+                        }
+                    });
+                });
             });
         }
 
-        // Initialize PIN inputs for both verification and setup modals
-        setupPinInputs('#pinVerificationModal .pin-input-group');
-        setupPinInputs('#pinSetupModal .pin-input-group');
+        // Initialize PIN inputs for both modals
+        setupPinInputs('#pinSetupModal');
+        setupPinInputs('#pinVerificationModal');
     });
 
     function loadDashboardData() {

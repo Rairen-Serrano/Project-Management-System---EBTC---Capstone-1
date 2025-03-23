@@ -96,6 +96,8 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../js/script.js"></script>
     
+    <!-- FullCalendar -->
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
 </head>
 <body id="adminAppointmentsPage">
     <div class="admin-dashboard-wrapper">
@@ -105,9 +107,14 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <!-- Page Header -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h3>Appointments</h3>
-                <a href="archived_appointments.php" class="btn btn-secondary">
-                    <i class="fas fa-archive me-2"></i>View Archive
-                </a>
+                <div class="d-flex align-items-center">
+                    <button id="viewToggle" class="btn btn-primary me-2">
+                        <i class="fas fa-calendar-alt"></i>
+                    </button>
+                    <a href="archived_appointments.php" class="btn btn-secondary">
+                        <i class="fas fa-archive me-2"></i>View Archive
+                    </a>
+                </div>
             </div>
 
             <!-- Filters -->
@@ -221,6 +228,13 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 </div>
             </div>
+
+            <!-- Calendar View -->
+            <div id="calendarView" class="card" style="display: none;">
+                <div class="card-body">
+                    <div id="appointmentCalendar"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -282,6 +296,55 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     .status-badge.cancelled {
         background-color: #dc3545;
         color: #fff;
+    }
+
+    #viewToggle {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+    }
+
+    #viewToggle i {
+        font-size: 1.2rem;
+        margin: 0;
+    }
+
+    #appointmentCalendar {
+        height: 600px;
+        margin: 20px 0;
+    }
+
+    .fc-event {
+        cursor: pointer;
+        margin-bottom: 2px !important;
+    }
+
+    .fc-event-title {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding: 2px 4px;
+    }
+
+    /* Improve spacing between events */
+    .fc-daygrid-event-harness {
+        margin-bottom: 2px !important;
+    }
+
+    /* Style for the "more" link */
+    .fc-daygrid-more-link {
+        font-weight: bold;
+        color: #666;
+    }
+
+    /* Enhanced styling for today's date */
+    .fc .fc-day-today {
+        background-color: rgba(var(--bs-primary-rgb), 0.1) !important;
+        border: 2px solid var(--bs-primary) !important;
     }
     </style>
 
@@ -353,6 +416,73 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             window.location.href = `archive_appointment.php?id=${appointmentId}`;
         }
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const tableView = document.querySelector('.table-responsive').closest('.card');
+        const calendarView = document.getElementById('calendarView');
+        const viewToggle = document.getElementById('viewToggle');
+        let calendar;
+
+        // Convert PHP appointments to calendar events
+        const events = <?php echo json_encode(array_map(function($appointment) {
+            $dateTime = date('Y-m-d', strtotime($appointment['date'])) . 'T' . 
+                       date('H:i:s', strtotime($appointment['time']));
+            
+            return [
+                'id' => $appointment['appointment_id'],
+                'title' => date('h:i A', strtotime($appointment['time'])) . ' - ' . $appointment['client_name'],
+                'start' => $dateTime,
+                'backgroundColor' => $appointment['status'] === 'pending' ? '#ffc107' : '#dc3545',
+                'borderColor' => $appointment['status'] === 'pending' ? '#ffc107' : '#dc3545',
+                'textColor' => $appointment['status'] === 'pending' ? '#000' : '#fff',
+                'extendedProps' => $appointment
+            ];
+        }, $appointments)); ?>;
+
+        // Initialize calendar
+        function initializeCalendar() {
+            const calendarEl = document.getElementById('appointmentCalendar');
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                events: events,
+                eventClick: function(info) {
+                    viewAppointment(info.event.extendedProps);
+                },
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,dayGridWeek'
+                },
+                dayMaxEvents: 4, // Show max 4 events before showing "+more"
+                eventTimeFormat: { // customize the time display
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    meridiem: 'short'
+                },
+                eventDisplay: 'block', // Makes events take full width
+                displayEventTime: false // Hide the default time display since we include it in the title
+            });
+            
+            setTimeout(() => {
+                calendar.render();
+                calendar.updateSize();
+            }, 100);
+        }
+
+        // Toggle view
+        viewToggle.addEventListener('click', function() {
+            if (tableView.style.display !== 'none') {
+                tableView.style.display = 'none';
+                calendarView.style.display = 'block';
+                if (!calendar) {
+                    initializeCalendar();
+                }
+            } else {
+                tableView.style.display = 'block';
+                calendarView.style.display = 'none';
+            }
+        });
+    });
     </script>
 
 </body>

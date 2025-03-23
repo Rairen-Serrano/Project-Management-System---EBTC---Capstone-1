@@ -149,10 +149,16 @@ $roles = $role_stmt->fetchAll(PDO::FETCH_COLUMN);
                                             </td>
                                             <td><?php echo date('M d, Y', strtotime($employee['archived_date'])); ?></td>
                                             <td>
-                                                <button type="button" class="btn btn-sm btn-danger" 
-                                                        onclick="deleteEmployee(<?php echo $employee['user_id']; ?>)">
-                                                    <i class="fas fa-trash"></i> Delete
-                                                </button>
+                                                <div class="btn-group">
+                                                    <button type="button" class="btn btn-sm btn-success" 
+                                                            onclick="restoreEmployee(<?php echo $employee['user_id']; ?>)">
+                                                        <i class="fas fa-undo"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-danger" 
+                                                            onclick="deleteEmployee(<?php echo $employee['user_id']; ?>)">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -181,5 +187,35 @@ $roles = $role_stmt->fetchAll(PDO::FETCH_COLUMN);
             </div>
         </div>
     </div>
+
+    <!-- Add this JavaScript function for restore functionality -->
+    <script>
+    function restoreEmployee(userId) {
+        if (confirm('Are you sure you want to restore this employee?')) {
+            // Create form data
+            const formData = new FormData();
+            formData.append('user_id', userId);
+
+            // Send restore request
+            fetch('restore_employee.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message || 'Employee restored successfully');
+                    location.reload();
+                } else {
+                    alert(data.message || 'Error restoring employee');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error restoring employee');
+            });
+        }
+    }
+    </script>
 </body>
 </html> 

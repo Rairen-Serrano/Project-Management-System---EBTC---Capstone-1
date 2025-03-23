@@ -21,6 +21,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception('CSRF token validation failed');
         }
 
+        // Verify reCAPTCHA first
+        $recaptcha_token = $_POST['recaptcha_token'] ?? '';
+        if (empty($recaptcha_token)) {
+            throw new Exception('reCAPTCHA verification failed');
+        }
+
+        // Verify the token with Google
+        $recaptcha_url = 'https://www.google.com/recaptcha/api/siteverify';
+        $recaptcha_secret = '6LcVU_wqAAAAAKp4DJS_cEa4RecUQ8M4ECERbXPy';
+        
+        $recaptcha_response = file_get_contents($recaptcha_url . '?secret=' . $recaptcha_secret . '&response=' . $recaptcha_token);
+        $recaptcha_data = json_decode($recaptcha_response);
+
+        // Check if verification was successful and score is acceptable
+        if (!$recaptcha_data->success || $recaptcha_data->score < 0.5) {
+            throw new Exception('reCAPTCHA verification failed. Please try again.');
+        }
+
         $name = trim($_POST['name'] ?? '');
         $email = filter_var(trim($_POST['email'] ?? ''), FILTER_VALIDATE_EMAIL);
         $password = $_POST['password'] ?? '';
@@ -84,10 +102,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     // Insert user
                     $stmt = $pdo->prepare("
-                        INSERT INTO users (name, email, password, role, phone, date_created, status) 
-                        VALUES (?, ?, ?, ?, ?, NOW(), 'pending')
+                        INSERT INTO users (
+                            name, 
+                            email, 
+                            password, 
+                            role, 
+                            phone, 
+                            date_created, 
+                            status,
+                            pin_code
+                        ) 
+                        VALUES (
+                            ?, ?, ?, ?, ?, 
+                            NOW(), 
+                            'pending',
+                            NULL
+                        )
                     ");
-                    $stmt->execute([$name, $email, $hashed_password, $role, $phone]);
+                    $stmt->execute([
+                        $name, 
+                        $email, 
+                        $hashed_password, 
+                        $role, 
+                        $phone
+                    ]);
                     
                     // Generate verification token
                     $verification_token = bin2hex(random_bytes(32));
@@ -104,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Send verification email
                     if (sendVerificationEmail($email, $verification_token)) {
                         $_SESSION['success_message'] = 'Registration successful! Please check your email to verify your account.';
-                        header('Location: index.php');
+                        header('Location: verification_pending.php');
                         exit;
                     } else {
                         throw new Exception('Failed to send verification email');
@@ -117,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         if (!empty($errors)) {
-            $error_message = implode('<br>', $errors);
+            $error_message = implode(' • ', $errors);
         }
         
     } catch(Exception $e) {
@@ -219,6 +257,9 @@ function sendVerificationEmail($email, $token) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
     
+    <!-- Google reCAPTCHA -->
+    <script src="https://www.google.com/recaptcha/api.js?render=6LcVU_wqAAAAANKqzxrZ-qBG1FFxOHhJd97KJSWD"></script>
+
 </head>
 <body id="registerPage">
     <?php include 'header.php'; ?>
@@ -233,12 +274,13 @@ function sendVerificationEmail($email, $token) {
                         <?php if (isset($error_message)): ?>
                             <div class="alert alert-danger">
                                 <i class="fas fa-exclamation-circle me-2"></i>
-                                <?php echo htmlspecialchars($error_message); ?>
+                                <?php echo $error_message; ?>
                             </div>
                         <?php endif; ?>
 
                         <form method="POST" action="" id="registerForm">
                             <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                            <input type="hidden" name="recaptcha_token" id="recaptcha_token">
                             
                             <div class="row">
                                 <div class="col-md-12 mb-4">
@@ -291,6 +333,14 @@ function sendVerificationEmail($email, $token) {
                                 </div>
                             </div>
                             
+                            <div class="form-check mb-4">
+                                <input class="form-check-input" type="checkbox" id="agreeTerms" name="agreeTerms" required>
+                                <label class="form-check-label small" for="agreeTerms">
+                                    I agree to the <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">Terms and Conditions</a> and 
+                                    <a href="#" data-bs-toggle="modal" data-bs-target="#privacyModal">Data Privacy Policy</a>
+                                </label>
+                            </div>
+                            
                             <button type="submit" class="btn btn-primary w-100 py-3 mb-4">Create Account</button>
                             
                             <div class="text-center">
@@ -304,5 +354,137 @@ function sendVerificationEmail($email, $token) {
     </div>
 
     <?php include 'footer.php'; ?>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('registerForm');
+        
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Add loading indicator
+            const submitButton = form.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Account...';
+            submitButton.disabled = true;
+            
+            grecaptcha.ready(function() {
+                grecaptcha.execute('6LcVU_wqAAAAANKqzxrZ-qBG1FFxOHhJd97KJSWD', {action: 'submit'})
+                .then(function(token) {
+                    document.getElementById('recaptcha_token').value = token;
+                    form.submit();
+                })
+                .catch(function(error) {
+                    submitButton.innerHTML = originalText;
+                    submitButton.disabled = false;
+                    alert('Error verifying request. Please try again.');
+                });
+            });
+        });
+    });
+    </script>
+
+    <!-- Privacy Policy Modal -->
+    <div class="modal fade" id="privacyModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Data Privacy Policy</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Republic Act 10173 – Data Privacy Act of 2012</h6>
+                    <p>This privacy policy is in compliance with Republic Act No. 10173, also known as the Data Privacy Act of 2012, which protects individuals' personal information in information and communications systems.</p>
+
+                    <h6>Collection of Personal Information</h6>
+                    <p>We collect personal information that you voluntarily provide when using our services, including but not limited to:</p>
+                    <ul>
+                        <li>Name</li>
+                        <li>Email address</li>
+                        <li>Phone number</li>
+                        <li>Other information necessary for service delivery</li>
+                    </ul>
+
+                    <h6>Use of Personal Information</h6>
+                    <p>Your personal information will be used for:</p>
+                    <ul>
+                        <li>Providing and improving our services</li>
+                        <li>Communication regarding your appointments and inquiries</li>
+                        <li>Account management and verification</li>
+                        <li>Compliance with legal obligations</li>
+                    </ul>
+
+                    <h6>Protection of Personal Information</h6>
+                    <p>We implement appropriate security measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.</p>
+
+                    <h6>Your Rights Under the Data Privacy Act</h6>
+                    <p>You have the right to:</p>
+                    <ul>
+                        <li>Be informed about the collection and use of your personal data</li>
+                        <li>Access your personal information</li>
+                        <li>Object to the processing of your personal data</li>
+                        <li>Rectify inaccurate or incorrect personal data</li>
+                        <li>Remove or withdraw your personal information</li>
+                        <li>Be indemnified for damages due to inaccurate information</li>
+                        <li>Data portability</li>
+                    </ul>
+
+                    <h6>Contact Information</h6>
+                    <p>For any concerns regarding your personal data, please contact our Data Protection Officer at [contact information].</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Terms and Conditions Modal -->
+    <div class="modal fade" id="termsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Terms and Conditions</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>1. Acceptance of Terms</h6>
+                    <p>By accessing and using this service, you accept and agree to be bound by the terms and conditions of this agreement.</p>
+
+                    <h6>2. User Account Responsibilities</h6>
+                    <ul>
+                        <li>You are responsible for maintaining the confidentiality of your account credentials</li>
+                        <li>You agree to provide accurate and complete information</li>
+                        <li>You must notify us immediately of any unauthorized use of your account</li>
+                    </ul>
+
+                    <h6>3. Service Usage</h6>
+                    <ul>
+                        <li>Services must be used for lawful purposes only</li>
+                        <li>Appointments must be canceled at least 24 hours in advance</li>
+                        <li>Users must provide accurate information for appointments</li>
+                    </ul>
+
+                    <h6>4. Intellectual Property</h6>
+                    <p>All content and materials available through our service are protected by intellectual property rights.</p>
+
+                    <h6>5. Limitation of Liability</h6>
+                    <p>We shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of our services.</p>
+
+                    <h6>6. Modifications to Service</h6>
+                    <p>We reserve the right to modify or discontinue the service at any time without notice.</p>
+
+                    <h6>7. Governing Law</h6>
+                    <p>These terms shall be governed by and construed in accordance with the laws of the Philippines.</p>
+
+                    <h6>8. Contact Information</h6>
+                    <p>For any questions regarding these terms, please contact us at [contact information].</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html> 

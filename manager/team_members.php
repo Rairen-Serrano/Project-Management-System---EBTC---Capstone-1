@@ -237,10 +237,134 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
+    <!-- Add Member Modal -->
+    <div class="modal fade" id="addMemberModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-user-plus me-2"></i>Add Team Member
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="availableMembersList">
+                        <!-- Available members will be loaded here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-    function addTeamMember(projectId) {
-        // Redirect to the project details page with the personnel section focused
-        window.location.href = `projects.php?action=view&id=${projectId}&section=personnel`;
+    async function addTeamMember(projectId) {
+        try {
+            const response = await fetch(`../api/manager/get_available_members.php?project_id=${projectId}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to load available members');
+            }
+
+            const membersList = document.getElementById('availableMembersList');
+            membersList.innerHTML = '';
+
+            if (!data.members || data.members.length === 0) {
+                membersList.innerHTML = `
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-users fa-3x mb-3"></i>
+                        <p class="mb-0">No available members found</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Group members by role
+            const groupedMembers = {
+                engineer: data.members.filter(m => m.role === 'engineer'),
+                technician: data.members.filter(m => m.role === 'technician'),
+                worker: data.members.filter(m => m.role === 'worker')
+            };
+
+            // Create sections for each role
+            for (const [role, members] of Object.entries(groupedMembers)) {
+                if (members.length > 0) {
+                    const section = document.createElement('div');
+                    section.className = 'mb-4';
+                    section.innerHTML = `
+                        <h6 class="mb-3">${role.charAt(0).toUpperCase() + role.slice(1)}s</h6>
+                        <div class="row g-3">
+                            ${members.map(member => `
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="member-avatar me-3">
+                                                        <i class="fas fa-user-circle fa-2x text-secondary"></i>
+                                                    </div>
+                                                    <div>
+                                                        <h6 class="mb-1">${member.name}</h6>
+                                                        <small class="text-muted">${member.email}</small>
+                                                    </div>
+                                                </div>
+                                                <button class="btn btn-sm btn-primary" onclick="assignMember(${projectId}, ${member.user_id}, '${member.name}')">
+                                                    <i class="fas fa-plus me-1"></i>Add
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                    membersList.appendChild(section);
+                }
+            }
+
+            // Show the modal
+            const modal = new bootstrap.Modal(document.getElementById('addMemberModal'));
+            modal.show();
+        } catch (error) {
+            console.error('Error loading available members:', error);
+            alert('Failed to load available members. Please try again.');
+        }
+    }
+
+    async function assignMember(projectId, userId, memberName) {
+        if (!confirm(`Are you sure you want to add ${memberName} to this project?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch('../api/manager/assign_member.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    project_id: projectId,
+                    user_id: userId
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to assign team member');
+            }
+
+            // Close the modal and reload the page
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addMemberModal'));
+            modal.hide();
+            location.reload();
+        } catch (error) {
+            console.error('Error:', error);
+            alert(error.message);
+        }
     }
 
     async function viewMemberTasks(userId, projectId) {

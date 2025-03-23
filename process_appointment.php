@@ -8,97 +8,94 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'client') {
     exit;
 }
 
-try {
-    // Get form data
-    $services = $_POST['services'] ?? [];
-    $date = $_POST['date'] ?? '';
-    $time = $_POST['time'] ?? '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        // Verify reCAPTCHA first
+        $recaptcha_token = $_POST['recaptcha_token'] ?? '';
+        if (empty($recaptcha_token)) {
+            throw new Exception('reCAPTCHA verification failed');
+        }
 
-    // Validate data
-    if (empty($services) || empty($date) || empty($time)) {
-        throw new Exception('Please fill in all required fields');
-    }
+        // Verify the token with Google
+        $recaptcha_url = 'https://www.google.com/recaptcha/api/siteverify';
+        $recaptcha_secret = '6LcVU_wqAAAAAKp4DJS_cEa4RecUQ8M4ECERbXPy';
+        
+        $recaptcha_response = file_get_contents($recaptcha_url . '?secret=' . $recaptcha_secret . '&response=' . $recaptcha_token);
+        $recaptcha_data = json_decode($recaptcha_response);
 
-    // Format services array into a string with HTML line breaks instead of \n
-    $service_list = implode("<br>", $services);
+        // Check if verification was successful and score is acceptable
+        if (!$recaptcha_data->success || $recaptcha_data->score < 0.5) {
+            throw new Exception('reCAPTCHA verification failed. Please try again.');
+        }
 
-    // Start transaction
-    $pdo->beginTransaction();
+        // Debug line to see what's being submitted
+        error_log("Received POST data: " . print_r($_POST, true));
 
-    // Insert appointment
-    $stmt = $pdo->prepare("
-        INSERT INTO appointments (client_id, service, date, time, status, created_at)
-        VALUES (?, ?, ?, ?, 'pending', NOW())
-    ");
+        $date = $_POST['date'] ?? '';
+        $time = $_POST['time'] ?? '';
+        $services = isset($_POST['service']) ? (array)$_POST['service'] : [];
 
-    $stmt->execute([
-        $_SESSION['user_id'],
-        $service_list,
-        $date,
-        $time
-    ]);
+        // Validate inputs
+        if (empty($date)) {
+            throw new Exception('Please select a date');
+        }
+        if (empty($time)) {
+            throw new Exception('Please select a time');
+        }
+        if (empty($services)) {
+            throw new Exception('Please select at least one service');
+        }
 
-    // Get the newly created appointment ID
-    $appointment_id = $pdo->lastInsertId();
+        // Check if the time slot is already booked
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM appointments 
+            WHERE date = ? 
+            AND time = ? 
+            AND status != 'cancelled'
+        ");
+        $stmt->execute([$date, $time]);
+        $exists = $stmt->fetchColumn();
 
-    // Get admin user IDs
-    $admin_query = $pdo->prepare("SELECT user_id FROM users WHERE role = 'admin'");
-    $admin_query->execute();
-    $admin_ids = $admin_query->fetchAll(PDO::FETCH_COLUMN);
+        if ($exists > 0) {
+            $_SESSION['error_message'] = 'This time slot is already booked. Please select another time.';
+            header('Location: book_appointment.php');
+            exit;
+        }
 
-    // Send notification to all admins
-    if (!empty($admin_ids)) {
-        $notification_stmt = $pdo->prepare("
-            INSERT INTO notifications (user_id, recipient_id, type, reference_id, title, message, is_read, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, FALSE, NOW())
+        // Convert service array to string if it's an array
+        $servicesString = is_array($services) ? implode(', ', $services) : $services;
+
+        // If time slot is available, proceed with booking
+        $stmt = $pdo->prepare("
+            INSERT INTO appointments (
+                client_id, 
+                date, 
+                time, 
+                service, 
+                status, 
+                created_at
+            ) VALUES (?, ?, ?, ?, 'pending', NOW())
         ");
 
-        $title = "New Appointment Request";
-        $service_list = implode(", ", $services);
-        $message = "Client " . $_SESSION['name'] . " has requested an appointment for " . 
-                  date('M d, Y', strtotime($date)) . " at " . 
-                  date('h:i A', strtotime($time)) . ". Services requested: " . $service_list;
+        $stmt->execute([
+            $_SESSION['user_id'],
+            $date,
+            $time,
+            $servicesString,
+        ]);
 
-        foreach ($admin_ids as $admin_id) {
-            try {
-                $notification_stmt->execute([
-                    $_SESSION['user_id'],  // user_id (client who sent the notification)
-                    $admin_id,             // recipient_id (admin who receives the notification)
-                    'system',              // type
-                    $appointment_id,       // reference_id
-                    $title,                // title
-                    $message               // message
-                ]);
-            } catch (PDOException $e) {
-                // Log the error for debugging
-                error_log("Failed to insert notification for admin ID $admin_id: " . $e->getMessage());
-                error_log("SQL State: " . $e->getCode());
-                error_log("Message content: " . $message);
-                throw $e; // Re-throw to trigger rollback
-            }
-        }
+        $_SESSION['success_message'] = 'Appointment booked successfully!';
+        header('Location: client/dashboard.php');
+        exit;
+
+    } catch (Exception $e) {
+        $_SESSION['error_message'] = $e->getMessage();
+        header('Location: book_appointment.php');
+        exit;
     }
-
-    // Commit transaction
-    $pdo->commit();
-
-    // Redirect with success message
-    $_SESSION['success_message'] = 'Appointment booked successfully! We will review your request and get back to you soon.';
-    header('Location: client/dashboard.php');
-    exit;
-
-} catch (Exception $e) {
-    // Rollback transaction if error occurs
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
-
-    // Log the error
-    error_log("Appointment booking error: " . $e->getMessage());
-    
-    // Redirect with error message
-    $_SESSION['error_message'] = 'Failed to book appointment: ' . $e->getMessage();
-    header('Location: book_appointment.php');
-    exit;
 }
+
+header('Location: book_appointment.php');
+exit;
 ?> 

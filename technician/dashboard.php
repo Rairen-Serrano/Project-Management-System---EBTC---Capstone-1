@@ -145,10 +145,10 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                                         <tr>
                                             <th>Task Name</th>
                                             <th>Project</th>
+                                            <th>Description</th>
                                             <th>Assigned Date</th>
                                             <th>Due Date</th>
                                             <th>Status</th>
-                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -177,9 +177,9 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                                         foreach ($tasks as $task) {
                                             // Determine status class
                                             $statusClass = match($task['status']) {
-                                                'Completed' => 'bg-success',
-                                                'In Progress' => 'bg-primary',
-                                                'Pending' => 'bg-warning',
+                                                'completed' => 'bg-success',
+                                                'in_progress' => 'bg-primary',
+                                                'pending' => 'bg-warning',
                                                 default => 'bg-secondary'
                                             };
 
@@ -202,6 +202,7 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                                                         <?php echo htmlspecialchars($task['service']); ?>
                                                     </a>
                                                 </td>
+                                                <td><?php echo htmlspecialchars($task['description']); ?></td>
                                                 <td><?php echo date('M d, Y', strtotime($task['assigned_date'])); ?></td>
                                                 <td>
                                                     <div class="<?php echo $isOverdue ? 'text-danger' : ''; ?>">
@@ -215,30 +216,6 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
                                                     <span class="badge <?php echo $statusClass; ?>">
                                                         <?php echo $task['status']; ?>
                                                     </span>
-                                                </td>
-                                                <td>
-                                                    <div class="dropdown">
-                                                        <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
-                                                            <i class="fas fa-ellipsis-v"></i>
-                                                        </button>
-                                                        <ul class="dropdown-menu">
-                                                            <li>
-                                                                <a class="dropdown-item" href="task_details.php?id=<?php echo $task['task_id']; ?>">
-                                                                    <i class="fas fa-eye me-2"></i>View Details
-                                                                </a>
-                                                            </li>
-                                                            <li>
-                                                                <a class="dropdown-item" href="update_task.php?id=<?php echo $task['task_id']; ?>">
-                                                                    <i class="fas fa-edit me-2"></i>Update Progress
-                                                                </a>
-                                                            </li>
-                                                            <li>
-                                                                <a class="dropdown-item" href="#" onclick="addTaskNote(<?php echo $task['task_id']; ?>)">
-                                                                    <i class="fas fa-comment me-2"></i>Add Note
-                                                                </a>
-                                                            </li>
-                                                        </ul>
-                                                    </div>
                                                 </td>
                                             </tr>
                                         <?php } ?>
@@ -375,59 +352,116 @@ else if (!empty($user['pin_code']) && !isset($_SESSION['pin_verified'])) {
             const pinSetupModal = new bootstrap.Modal(document.getElementById('pinSetupModal'));
             pinSetupModal.show();
         } else if (!<?php echo isset($_SESSION['pin_verified']) ? 'true' : 'false'; ?>) {
+            // Remove any existing event listeners
+            const oldVerifyBtn = document.getElementById('verifyPinBtn');
+            if (oldVerifyBtn) {
+                const newVerifyBtn = oldVerifyBtn.cloneNode(true);
+                oldVerifyBtn.parentNode.replaceChild(newVerifyBtn, oldVerifyBtn);
+            }
+
+            // Show verification modal
             const pinVerificationModal = new bootstrap.Modal(document.getElementById('pinVerificationModal'));
             pinVerificationModal.show();
+
+            // Add single event listener
+            const verifyPinBtn = document.getElementById('verifyPinBtn');
+            let isVerifying = false; // Flag to prevent multiple submissions
+
+            if (verifyPinBtn) {
+                verifyPinBtn.addEventListener('click', function verifyPin() {
+                    // Prevent multiple submissions
+                    if (isVerifying) return;
+                    isVerifying = true;
+
+                    const pinInputs = document.querySelectorAll('#pinVerificationModal .pin-input');
+                    const pin = Array.from(pinInputs).map(input => input.value).join('');
+                    const errorElement = document.getElementById('pinError');
+                    
+                    if (pin.length !== 4) {
+                        errorElement.textContent = 'Please enter a 4-digit PIN';
+                        errorElement.style.display = 'block';
+                        isVerifying = false;
+                        return;
+                    }
+
+                    console.log('Sending PIN verification request...'); // Debug log
+                    
+                    fetch('../api/auth/verify_pin.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ pin }),
+                        credentials: 'same-origin' // Include cookies
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Verification response:', data); // Debug log
+                        
+                        if (data.success) {
+                            // Remove the event listener to prevent multiple calls
+                            verifyPinBtn.removeEventListener('click', verifyPin);
+                            
+                            // Hide the modal
+                            const modal = bootstrap.Modal.getInstance(document.getElementById('pinVerificationModal'));
+                            modal.hide();
+                            
+                            // Clean up
+                            if (document.querySelector('.modal-backdrop')) {
+                                document.querySelector('.modal-backdrop').remove();
+                            }
+                            document.body.classList.remove('modal-open');
+                            document.body.style.removeProperty('padding-right');
+                            document.body.style.removeProperty('overflow');
+                            
+                            // Show main content and reload
+                            document.querySelector('.engineer-main-content').style.display = 'block';
+                            window.location.reload();
+                        } else {
+                            errorElement.textContent = data.message || 'Invalid PIN. Please try again.';
+                            errorElement.style.display = 'block';
+                            
+                            if (data.lockout_duration) {
+                                verifyPinBtn.disabled = true;
+                                startLockoutCountdown(data.lockout_duration);
+                            }
+                            
+                            pinInputs.forEach(input => input.value = '');
+                            pinInputs[0].focus();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Verification error:', error); // Debug log
+                        errorElement.textContent = 'An error occurred. Please try again.';
+                        errorElement.style.display = 'block';
+                    })
+                    .finally(() => {
+                        isVerifying = false;
+                    });
+                });
+            }
         }
 
-        // Handle PIN verification
-        const verifyPinBtn = document.getElementById('verifyPinBtn');
-        if (verifyPinBtn) {
-            verifyPinBtn.addEventListener('click', function() {
-                const pinInputs = document.querySelectorAll('#pinVerificationModal .pin-input');
-                const pin = Array.from(pinInputs).map(input => input.value).join('');
+        function startLockoutCountdown(duration) {
+            const verifyBtn = document.getElementById('verifyPinBtn');
+            const errorDiv = document.getElementById('pinError');
+            let timeLeft = duration;
+
+            const countdownInterval = setInterval(() => {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                errorDiv.textContent = `Account locked. Please try again in ${minutes}:${seconds.toString().padStart(2, '0')} minutes`;
                 
-                if (pin.length !== 4) {
-                    document.getElementById('pinError').style.display = 'block';
-                    return;
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    verifyBtn.disabled = false;
+                    errorDiv.textContent = 'You can now try again.';
+                    setTimeout(() => {
+                        errorDiv.style.display = 'none';
+                    }, 3000);
                 }
-                
-                fetch('../api/auth/verify_pin.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ pin })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Hide the modal properly
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('pinVerificationModal'));
-                        modal.hide();
-                        
-                        // Clean up modal artifacts
-                        document.querySelector('.modal-backdrop').remove();
-                        document.body.classList.remove('modal-open');
-                        document.body.style.removeProperty('padding-right');
-                        document.body.style.removeProperty('overflow');
-                        
-                        // Show the main content
-                        document.querySelector('.engineer-main-content').style.display = 'block';
-                        
-                        // Refresh the page to ensure everything is properly loaded
-                        window.location.reload();
-                    } else {
-                        document.getElementById('pinError').style.display = 'block';
-                        pinInputs.forEach(input => input.value = '');
-                        pinInputs[0].focus();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('pinError').textContent = 'An error occurred. Please try again.';
-                    document.getElementById('pinError').style.display = 'block';
-                });
-            });
+                timeLeft--;
+            }, 1000);
         }
 
         // Load Dashboard Data

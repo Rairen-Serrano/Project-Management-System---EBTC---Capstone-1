@@ -9,7 +9,7 @@ ini_set('display_errors', 1);
 // Clear any existing redirect loop
 if (isset($_SESSION['login_attempts']) && $_SESSION['login_attempts'] > 5) {
     session_unset();
-    session_destroy();
+    session_destroy();  
     session_start();
 }
 
@@ -113,8 +113,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error_message = 'Invalid email or password';
         }
     } catch(Exception $e) {
+        error_log("Login error: " . $e->getMessage());
         $error_message = $e->getMessage();
-        error_log("Admin login error: " . $e->getMessage());
     }
 }
 ?>
@@ -147,8 +147,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
 
-    <!-- Add reCAPTCHA script -->
+    <!-- Add before closing </head> tag -->
     <script src="https://www.google.com/recaptcha/api.js?render=6LcVU_wqAAAAANKqzxrZ-qBG1FFxOHhJd97KJSWD"></script>
+
 </head>
 <body id="adminLoginPage">
     <?php include 'header.php'; ?>
@@ -168,7 +169,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?php endif; ?>
 
                         <form method="POST" action="admin_login.php" id="loginForm">
-                            <!-- Add hidden input for recaptcha token -->
                             <input type="hidden" name="recaptcha_token" id="recaptcha_token">
                             
                             <div class="form-floating mb-4">
@@ -197,34 +197,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <?php include 'footer.php'; ?>
-
-    <!-- Add reCAPTCHA handling script -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         const form = document.getElementById('loginForm');
         
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            // Add loading indicator
-            const submitButton = form.querySelector('button[type="submit"]');
-            const originalText = submitButton.innerHTML;
-            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
-            submitButton.disabled = true;
-            
-            grecaptcha.ready(function() {
-                grecaptcha.execute('6LcVU_wqAAAAANKqzxrZ-qBG1FFxOHhJd97KJSWD', {action: 'submit'})
-                .then(function(token) {
-                    document.getElementById('recaptcha_token').value = token;
-                    form.submit();
-                })
-                .catch(function(error) {
-                    submitButton.innerHTML = originalText;
-                    submitButton.disabled = false;
-                    alert('Error verifying request. Please try again.');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Add loading indicator
+                const submitButton = form.querySelector('button[type="submit"]');
+                const originalText = submitButton.innerHTML;
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
+                submitButton.disabled = true;
+                
+                grecaptcha.ready(function() {
+                    grecaptcha.execute('6LcVU_wqAAAAANKqzxrZ-qBG1FFxOHhJd97KJSWD', {action: 'submit'})
+                    .then(function(token) {
+                        document.getElementById('recaptcha_token').value = token;
+                        form.submit();
+                    })
+                    .catch(function(error) {
+                        submitButton.innerHTML = originalText;
+                        submitButton.disabled = false;
+                        alert('Error verifying request. Please try again.');
+                    });
                 });
             });
-        });
+        }
     });
     </script>
 </body>

@@ -76,9 +76,14 @@ if (!$project) {
                         Client: <?php echo htmlspecialchars($project['client_name']); ?>
                     </p>
                 </div>
-                <a href="projects.php" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left me-2"></i>Back to Projects
-                </a>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-info" onclick="showArchivedTasks()">
+                        <i class="fas fa-archive me-2"></i>Archived Tasks
+                    </button>
+                    <a href="projects.php" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Projects
+                    </a>
+                </div>
             </div>
 
             <div class="row g-4">
@@ -370,6 +375,44 @@ if (!$project) {
         </div>
     </div>
 
+    <!-- Add this modal after your other modals -->
+    <div class="modal fade" id="archivedTasksModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title">
+                        <i class="fas fa-archive me-2"></i>Archived Tasks
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table" id="archivedTaskTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 20%">Task</th>
+                                    <th style="width: 15%">Category</th>
+                                    <th style="width: 30%">Assigned To</th>
+                                    <th style="width: 15%">Due Date</th>
+                                    <th style="width: 10%">Status</th>
+                                    <th style="width: 10%">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Archived tasks will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
     // At the top of your script, declare projectId as a global variable
     let projectId;
@@ -451,8 +494,14 @@ if (!$project) {
         }
 
         // Save Task button click handler
-        document.querySelector('#addTaskModal .btn-primary').addEventListener('click', async function() {
-            console.log('Save Task button clicked');
+        const saveTaskButton = document.querySelector('#addTaskModal .btn-primary');
+        saveTaskButton.addEventListener('click', async function() {
+            await saveNewTask();
+        });
+
+        // Move the existing save task logic to a new function
+        async function saveNewTask() {
+            console.log('Save new task');
             const taskName = document.getElementById('taskName').value.trim();
             const categoryId = document.getElementById('taskCategory').value;
             const dueDate = document.getElementById('taskDueDate').value;
@@ -538,7 +587,7 @@ if (!$project) {
                 console.error('Error in task creation process:', error);
                 showAlert('error', error.message || 'Failed to add task');
             }
-        });
+        }
 
         // Function to load project personnel
         async function loadProjectPersonnel(container) {
@@ -729,7 +778,7 @@ if (!$project) {
 
     async function loadTasks() {
         try {
-            const response = await fetch(`api/tasks.php?action=tasks&project_id=${projectId}`);
+            const response = await fetch(`../api/tasks.php?action=tasks&project_id=${projectId}`);
             const data = await response.json();
 
             if (!response.ok) {
@@ -800,9 +849,9 @@ if (!$project) {
                                     title="View Details">
                                 <i class="fas fa-eye"></i>
                             </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteTask(${task.task_id})"
-                                    title="Delete Task">
-                                <i class="fas fa-trash"></i>
+                            <button class="btn btn-sm btn-outline-warning" onclick="archiveTask(${task.task_id})"
+                                    title="Archive Task">
+                                <i class="fas fa-archive"></i>
                             </button>
                         </div>
                     </td>
@@ -868,33 +917,40 @@ if (!$project) {
         return classes[status] || 'bg-secondary';
     }
 
-    function viewTaskDetails(taskId) {
+    async function viewTaskDetails(taskId) {
         try {
-            // Get task details from the table row
-            const taskRow = document.querySelector(`tr[data-task-id="${taskId}"]`);
-            if (!taskRow) {
-                throw new Error('Task not found');
+            // Get task details from the server
+            const response = await fetch(`../api/tasks.php?action=get_task_details&task_id=${taskId}`);
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to load task details');
             }
+
+            const task = data.task;
 
             // Set task ID in modal for reference
             const modal = document.getElementById('taskDetailsModal');
             modal.dataset.taskId = taskId;
 
-            // Get task data from the row
-            const taskName = taskRow.querySelector('td:first-child .fw-medium').textContent.trim();
-            const description = taskRow.dataset.description;
-            const category = taskRow.querySelector('td:nth-child(2)').textContent.trim();
-            const dueDate = taskRow.querySelector('td:nth-child(4) span:first-child').textContent.trim();
-            const status = taskRow.querySelector('td:nth-child(5) .badge').textContent.trim();
-            const assignees = taskRow.querySelector('td:nth-child(3)').innerHTML;
-
             // Update modal content
-            document.getElementById('modalTaskName').textContent = taskName;
-            document.getElementById('modalTaskDescription').textContent = description || 'No description available';
-            document.getElementById('modalTaskCategory').textContent = category || 'No category';
-            document.getElementById('modalTaskDueDate').textContent = dueDate;
-            document.getElementById('modalTaskStatus').innerHTML = `<span class="badge ${getStatusBadgeClass(status.toLowerCase())}">${status}</span>`;
-            document.getElementById('modalTaskAssignees').innerHTML = assignees;
+            document.getElementById('modalTaskName').textContent = task.task_name;
+            document.getElementById('modalTaskDescription').textContent = task.description || 'No description available';
+            document.getElementById('modalTaskCategory').textContent = task.category_name || 'No category';
+            document.getElementById('modalTaskDueDate').textContent = formatDate(task.due_date);
+            document.getElementById('modalTaskStatus').innerHTML = `
+                <span class="badge ${getStatusBadgeClass(task.status)}">
+                    ${capitalizeFirst(task.status.replace('_', ' '))}
+                </span>
+            `;
+
+            // Update assignees
+            const assigneesContainer = document.getElementById('modalTaskAssignees');
+            assigneesContainer.innerHTML = task.assignees.map(assignee => `
+                <span class="badge bg-light text-dark">
+                    ${escapeHtml(assignee.name)}
+                </span>
+            `).join('');
 
             // Hide assignee list container
             document.getElementById('modalAssigneeListContainer').style.display = 'none';
@@ -902,50 +958,16 @@ if (!$project) {
             // Show the modal
             const modalInstance = new bootstrap.Modal(modal);
             modalInstance.show();
+
         } catch (error) {
             console.error('Error viewing task details:', error);
             showAlert('error', 'Failed to load task details');
         }
     }
 
-    // Function to delete task
-    async function deleteTask(taskId) {
-        if (!confirm('Are you sure you want to delete this task?')) {
-            return;
-        }
-
-        try {
-            console.log('Deleting task:', taskId, 'from project:', projectId); // Debug log
-            const response = await fetch(`../api/tasks.php?action=delete_task&project_id=${projectId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    task_id: taskId
-                })
-            });
-
-            const data = await response.json();
-            console.log('Delete response:', data); // Debug log
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to delete task');
-            }
-
-            // Reload tasks and update progress
-            await loadTasks();
-            await updateProgress();
-            showAlert('success', 'Task deleted successfully');
-        } catch (error) {
-            console.error('Error deleting task:', error);
-            showAlert('error', 'Failed to delete task: ' + error.message);
-        }
-    }
-
     async function updateProgress() {
         try {
-            const response = await fetch(`api/tasks.php?action=progress&project_id=${projectId}`);
+            const response = await fetch(`../api/tasks.php?action=progress&project_id=${projectId}`);
             const data = await response.json();
 
             if (!response.ok) {
@@ -971,7 +993,7 @@ if (!$project) {
     // Add this function to check if previous categories are completed
     async function checkPreviousCategories(categoryId) {
         try {
-            const response = await fetch(`api/tasks.php?action=check_previous_categories&project_id=${projectId}&category_id=${categoryId}`);
+            const response = await fetch(`../api/tasks.php?action=check_previous_categories&project_id=${projectId}&category_id=${categoryId}`);
             const data = await response.json();
             return data.can_proceed;
         } catch (error) {
@@ -1013,7 +1035,7 @@ if (!$project) {
     async function updateTaskStatus(taskId, newStatus) {
         try {
             // First check if the task can be updated
-            const checkResponse = await fetch(`api/tasks.php?action=can_update_task&task_id=${taskId}`);
+            const checkResponse = await fetch(`../api/tasks.php?action=can_update_task&task_id=${taskId}`);
             const checkData = await checkResponse.json();
 
             if (!checkData.can_update) {
@@ -1022,7 +1044,7 @@ if (!$project) {
             }
 
             // Proceed with status update if allowed
-            const response = await fetch(`api/tasks.php?action=update_task_status&task_id=${taskId}`, {
+            const response = await fetch(`../api/tasks.php?action=update_task_status&task_id=${taskId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1041,6 +1063,180 @@ if (!$project) {
         } catch (error) {
             console.error('Error updating task status:', error);
             showAlert('error', 'Failed to update task status');
+        }
+    }
+
+    async function archiveTask(taskId) {
+        if (!confirm('Are you sure you want to archive this task? Archived tasks will no longer appear in the active task list.')) {
+            return;
+        }
+
+        try {
+            console.log('Archiving task:', taskId, 'from project:', projectId);
+            const response = await fetch(`../api/tasks.php?action=archive_task&project_id=${projectId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    task_id: taskId
+                })
+            });
+
+            const data = await response.json();
+            console.log('Archive response:', data);
+
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to archive task');
+            }
+
+            // Reload tasks and update progress
+            await loadTasks();
+            await updateProgress();
+            showAlert('success', 'Task archived successfully');
+        } catch (error) {
+            console.error('Error archiving task:', error);
+            showAlert('error', 'Failed to archive task: ' + error.message);
+        }
+    }
+
+    // Add these functions to your existing script section
+    async function showArchivedTasks() {
+        try {
+            const response = await fetch(`../api/tasks.php?action=archived_tasks&project_id=${projectId}`);
+            const data = await response.json();
+
+            const tableBody = document.querySelector('#archivedTaskTable tbody');
+            tableBody.innerHTML = '';
+
+            if (!data.tasks || data.tasks.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            <i class="fas fa-archive fa-2x mb-3"></i>
+                            <p class="mb-0">No archived tasks found</p>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                data.tasks.forEach(task => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>
+                            <div class="d-flex flex-column">
+                                <span class="fw-medium">${escapeHtml(task.task_name)}</span>
+                                <small class="text-muted text-truncate" style="max-width: 200px;">
+                                    ${escapeHtml(task.description || 'No description')}
+                                </small>
+                            </div>
+                        </td>
+                        <td>${escapeHtml(task.category_name || '')}</td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-2">
+                                ${task.assignees.map(assignee => `
+                                    <span class="badge bg-light text-dark">
+                                        ${escapeHtml(assignee.name)}
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </td>
+                        <td>${formatDate(task.due_date)}</td>
+                        <td>
+                            <span class="badge ${getStatusBadgeClass(task.status)}">
+                                ${capitalizeFirst(task.status.replace('_', ' '))}
+                            </span>
+                        </td>
+                        <td>
+                            ${task.category_status === 'completed' ? `
+                                <button class="btn btn-sm btn-outline-secondary" disabled
+                                        title="Cannot return task: Category is completed">
+                                    <i class="fas fa-undo"></i>
+                                </button>
+                            ` : `
+                                <button class="btn btn-sm btn-outline-success" onclick="returnTask(${task.task_id})"
+                                        title="Return Task">
+                                    <i class="fas fa-undo"></i>
+                                </button>
+                            `}
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+
+            const modal = new bootstrap.Modal(document.getElementById('archivedTasksModal'));
+            modal.show();
+        } catch (error) {
+            console.error('Error loading archived tasks:', error);
+            showAlert('error', 'Failed to load archived tasks');
+        }
+    }
+
+    async function returnTask(taskId) {
+        if (!confirm('Are you sure you want to return this task to the active task list?')) {
+            return;
+        }
+
+        try {
+            // First check if the task's category is completed
+            const checkResponse = await fetch(`../api/tasks.php?action=check_category_status&task_id=${taskId}`);
+            const checkData = await checkResponse.json();
+
+            if (!checkData.success) {
+                throw new Error(checkData.error || 'Failed to check category status');
+            }
+
+            if (checkData.is_category_completed) {
+                showAlert('error', 'Cannot return task: The category is already completed');
+                return;
+            }
+
+            const response = await fetch(`../api/tasks.php?action=return_task&project_id=${projectId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    task_id: taskId
+                })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to return task');
+            }
+
+            // Get the modal instance and hide it
+            const archivedTasksModal = bootstrap.Modal.getInstance(document.getElementById('archivedTasksModal'));
+            if (archivedTasksModal) {
+                archivedTasksModal.hide();
+            }
+
+            // Remove modal backdrop manually if it exists
+            const modalBackdrop = document.querySelector('.modal-backdrop');
+            if (modalBackdrop) {
+                modalBackdrop.remove();
+            }
+
+            // Remove modal-open class from body
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+
+            // Reload tasks and update progress
+            await loadTasks();
+            await updateProgress();
+            showAlert('success', 'Task returned successfully');
+
+            // Reload archived tasks modal after a short delay
+            setTimeout(() => {
+                showArchivedTasks();
+            }, 300);
+
+        } catch (error) {
+            console.error('Error returning task:', error);
+            showAlert('error', 'Failed to return task: ' + error.message);
         }
     }
     </script>

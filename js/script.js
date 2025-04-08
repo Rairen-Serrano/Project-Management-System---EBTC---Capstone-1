@@ -1837,12 +1837,12 @@ function handleAdminDashboardPage() {
             }
 
             // Make an AJAX call to save the PIN
-            fetch('setup_pin.php', {
+            fetch('../api/auth/setup_pin.php', {
         method: 'POST',
         headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Type': 'application/json'
                 },
-                body: 'pin=' + setupPin
+                body: JSON.stringify({ pin: setupPin })
             })
             .then(response => response.json())
             .then(data => {
@@ -1850,13 +1850,13 @@ function handleAdminDashboardPage() {
                     mainContent.style.display = 'block';
                     setupModal.hide();
                 } else {
-                    document.getElementById('pinSetupError').textContent = data.message || 'Error setting PIN';
+                    document.getElementById('pinSetupError').textContent = data.message;
                     document.getElementById('pinSetupError').style.display = 'block';
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                document.getElementById('pinSetupError').textContent = 'Error setting PIN';
+                document.getElementById('pinSetupError').textContent = 'An error occurred. Please try again.';
                 document.getElementById('pinSetupError').style.display = 'block';
             });
         });

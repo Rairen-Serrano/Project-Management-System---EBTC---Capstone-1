@@ -88,6 +88,21 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../js/script.js"></script>
+
+    <style>
+        .personnel-select:disabled + label {
+            cursor: not-allowed;
+        }
+        
+        .text-muted.bg-light td {
+            opacity: 0.7;
+        }
+        
+        .personnel-availability {
+            font-size: 0.8rem;
+            margin-top: 2px;
+        }
+    </style>
 </head>
 <body id="managerProjectsPage">
     <div class="manager-dashboard-wrapper">
@@ -277,8 +292,18 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <div id="modalNotes" class="p-3 bg-light rounded"></div>
                                     </div>
                                     <div class="mb-3">
-                                        <h6 class="mb-2">Quotation File</h6>
-                                        <div id="modalQuotationFile"></div>
+                                        <h6 class="mb-2">Project Files</h6>
+                                        <div class="row g-2">
+                                            <div class="col-md-4">
+                                                <div id="modalQuotationFile"></div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div id="modalContractFile"></div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div id="modalBudgetFile"></div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -463,7 +488,21 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <div class="mb-3">
                                         <label class="form-label"><i class="fas fa-file-pdf me-2"></i>Quotation File</label>
                                         <input type="file" class="form-control" id="quotationFile" accept=".pdf">
-                                        <small class="text-muted">Accepted format: PDF</small>
+                                        <small class="text-muted">Accepted format: PDF only</small>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="mb-3">
+                                        <label class="form-label"><i class="fas fa-file-pdf me-2"></i>Contract File</label>
+                                        <input type="file" class="form-control" id="contractFile" accept=".pdf">
+                                        <small class="text-muted">Accepted format: PDF only</small>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="mb-3">
+                                        <label class="form-label"><i class="fas fa-file-pdf me-2"></i>Budget/Costing File</label>
+                                        <input type="file" class="form-control" id="budgetFile" accept=".pdf">
+                                        <small class="text-muted">Accepted format: PDF only</small>
                                     </div>
                                 </div>
                             </div>
@@ -494,22 +533,38 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <?php
                                         // Get available personnel (excluding clients, admins, and project managers)
                                         $stmt = $pdo->prepare("
-                                            SELECT user_id, name, role, email 
-                                            FROM users 
-                                            WHERE role NOT IN ('client', 'admin', 'project_manager')
-                                            ORDER BY name ASC
+                                            SELECT 
+                                                u.user_id, 
+                                                u.name, 
+                                                u.role, 
+                                                u.email, 
+                                                u.active_projects,
+                                                CASE 
+                                                    WHEN u.role = 'engineer' THEN 2
+                                                    WHEN u.role IN ('technician', 'worker') THEN 1
+                                                    ELSE 0
+                                                END as max_projects
+                                            FROM users u
+                                            WHERE u.role NOT IN ('client', 'admin', 'project_manager')
+                                            ORDER BY u.name ASC
                                         ");
                                         $stmt->execute();
                                         $personnel = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                                        foreach ($personnel as $person): ?>
-                                            <tr>
+                                        foreach ($personnel as $person): 
+                                            $available = $person['active_projects'] < $person['max_projects'];
+                                            $availableText = $available ? 
+                                                "Available ({$person['active_projects']}/{$person['max_projects']} projects)" : 
+                                                "Not available ({$person['active_projects']}/{$person['max_projects']} projects)";
+                                        ?>
+                                            <tr class="<?php echo $available ? '' : 'text-muted bg-light'; ?>">
                                                 <td>
                                                     <div class="form-check">
                                                         <input class="form-check-input personnel-select" 
                                                                type="checkbox" 
                                                                value="<?php echo $person['user_id']; ?>"
-                                                               id="person<?php echo $person['user_id']; ?>">
+                                                               id="person<?php echo $person['user_id']; ?>"
+                                                               <?php echo $available ? '' : 'disabled'; ?>>
                                                     </div>
                                                 </td>
                                                 <td>
@@ -519,9 +574,15 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <span class="badge bg-secondary">
-                                                        <?php echo htmlspecialchars($person['role']); ?>
-                                                    </span>
+                                                    <div>
+                                                        <span class="badge bg-secondary">
+                                                            <?php echo htmlspecialchars($person['role']); ?>
+                                                        </span>
+                                                        <br>
+                                                        <small class="text-<?php echo $available ? 'success' : 'danger'; ?>">
+                                                            <?php echo $availableText; ?>
+                                                        </small>
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     <div class="d-flex align-items-center">
@@ -609,7 +670,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Handle select all checkbox
         document.getElementById('selectAllPersonnel').addEventListener('change', function() {
-            document.querySelectorAll('.personnel-select').forEach(checkbox => {
+            document.querySelectorAll('.personnel-select:not([disabled])').forEach(checkbox => {
                 checkbox.checked = this.checked;
             });
         });
@@ -627,13 +688,35 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 console.error(`Element with id "${id}" not found`);
             }
         });
+
+        // Add file type validation
+        document.getElementById('quotationFile').addEventListener('change', function() {
+            validateFileType(this, 'Quotation file');
+        });
+
+        document.getElementById('contractFile').addEventListener('change', function() {
+            validateFileType(this, 'Contract file');
+        });
+
+        document.getElementById('budgetFile').addEventListener('change', function() {
+            validateFileType(this, 'Budget file');
+        });
     });
 
     function updateSelectAllState() {
-        const totalCheckboxes = document.querySelectorAll('.personnel-select').length;
-        const checkedCheckboxes = document.querySelectorAll('.personnel-select:checked').length;
-        document.getElementById('selectAllPersonnel').checked = totalCheckboxes === checkedCheckboxes;
-        document.getElementById('selectAllPersonnel').indeterminate = checkedCheckboxes > 0 && checkedCheckboxes < totalCheckboxes;
+        const availableCheckboxes = document.querySelectorAll('.personnel-select:not([disabled])');
+        const checkedAvailableCheckboxes = document.querySelectorAll('.personnel-select:not([disabled]):checked');
+        const selectAllCheckbox = document.getElementById('selectAllPersonnel');
+        
+        if (availableCheckboxes.length === 0) {
+            selectAllCheckbox.disabled = true;
+            selectAllCheckbox.checked = false;
+        } else {
+            selectAllCheckbox.disabled = false;
+            selectAllCheckbox.checked = availableCheckboxes.length === checkedAvailableCheckboxes.length;
+            selectAllCheckbox.indeterminate = checkedAvailableCheckboxes.length > 0 && 
+                checkedAvailableCheckboxes.length < availableCheckboxes.length;
+        }
     }
 
     function addToProjects(appointmentId, appointmentDate) {
@@ -664,122 +747,189 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         assignPersonnelModal.show();
     }
 
-    function confirmProjectAssignment() {
+    // Update this function in projects.php
+    async function checkPersonnelAvailability(selectedPersonnel) {
+        try {
+            console.log('Sending personnel data:', selectedPersonnel); // Debug log
+            
+            const response = await fetch('./api/check_personnel_availability.php', {  // Updated path with ./
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    personnel: selectedPersonnel
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const responseText = await response.text(); // Get raw response text
+            console.log('Raw response:', responseText); // Debug log
+            
+            try {
+                const data = JSON.parse(responseText);
+                if (!data.success) {
+                    throw new Error(data.message);
+                }
+                return data.available_personnel;
+            } catch (parseError) {
+                throw new Error(`Invalid JSON response: ${responseText}`);
+            }
+        } catch (error) {
+            console.error('Full error:', error); // Debug log
+            throw new Error(`Failed to check personnel availability: ${error.message}`);
+        }
+    }
+
+    // Modify the existing confirmProjectAssignment function
+    async function confirmProjectAssignment() {
         if (!currentAppointment) return;
 
         // Get selected personnel
         const selectedPersonnel = Array.from(document.querySelectorAll('.personnel-select:checked'))
-            .map(checkbox => checkbox.value);
+            .map(checkbox => ({
+                id: checkbox.value,
+                role: checkbox.closest('tr').querySelector('.badge').textContent.trim()
+            }));
 
         if (selectedPersonnel.length === 0) {
             alert('Please select at least one personnel to assign to the project.');
             return;
         }
 
-        // Get start and end dates
-        const startDate = document.getElementById('projectStartDate').value;
-        const endDate = document.getElementById('projectEndDate').value;
-
-        // Validate dates
-        if (!startDate || !endDate) {
-            alert('Please select both start and end dates for the project.');
-            return;
-        }
-
-        if (new Date(startDate) > new Date(endDate)) {
-            alert('End date cannot be earlier than start date.');
-            return;
-        }
-
-        // Get project notes and quotation file
-        const notes = document.getElementById('projectNotes').value;
-        const quotationFile = document.getElementById('quotationFile').files[0];
-
-        // Create FormData object
-        const formData = new FormData();
-        formData.append('appointment_id', currentAppointment.id);
-        formData.append('personnel', JSON.stringify(selectedPersonnel));
-        formData.append('start_date', startDate);
-        formData.append('end_date', endDate);
-        formData.append('notes', notes);
-        if (quotationFile) {
-            formData.append('quotation_file', quotationFile);
-        }
-
-        // Send request to create project and assign personnel
-        fetch('api/create_project.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Project creation response:', data);
+        // Check personnel availability
+        try {
+            const availablePersonnel = await checkPersonnelAvailability(selectedPersonnel);
             
-            if (data.success && data.project_id) {
-                // Create default task categories
-                return fetch('api/create_task_categories.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        project_id: data.project_id,
-                        categories: [
-                            {
-                                name: 'Project Planning and Design',
-                                description: 'Initial phase focusing on project scope definition, timeline planning, and technical design specifications.'
-                            },
-                            {
-                                name: 'Materials Selection and Procurement',
-                                description: 'Selection and acquisition of necessary materials, equipment, and resources for the project.'
-                            },
-                            {
-                                name: 'Project Execution',
-                                description: 'Implementation phase where the main project work is carried out according to specifications.'
-                            },
-                            {
-                                name: 'Maintenance and Optimization',
-                                description: 'Final phase ensuring project sustainability, performance optimization, and maintenance planning.'
-                            }
-                        ]
-                    })
-                }).then(response => response.json());
-            } else {
-                throw new Error(data.message || 'Project creation failed');
-            }
-        })
-        .then(categoryData => {
-            console.log('Category creation response:', categoryData);
-            if (categoryData.success) {
-                // Send notifications
-                const notificationData = new FormData();
-                notificationData.append('project_id', categoryData.project_id.toString());
-                notificationData.append('personnel', JSON.stringify(selectedPersonnel));
-                notificationData.append('service', currentAppointment.service);
+            const unavailablePersonnel = selectedPersonnel.filter(person => 
+                !availablePersonnel.includes(parseInt(person.id))
+            );
 
-                return fetch('send_project_notifications.php', {
-                    method: 'POST',
-                    body: notificationData
-                });
-            } else {
-                throw new Error(categoryData.message || 'Failed to create task categories');
+            if (unavailablePersonnel.length > 0) {
+                const unavailableNames = unavailablePersonnel.map(person => 
+                    document.querySelector(`#person${person.id}`).closest('tr').querySelector('.d-flex').textContent.trim()
+                );
+                
+                alert(`The following personnel have reached their project limit:\n${unavailableNames.join('\n')}`);
+                return;
             }
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Notification response:', data);
-            if (data.success) {
-                assignPersonnelModal.hide();
-                alert('Project created successfully with task categories!');
-                location.reload();
-            } else {
-                throw new Error(data.message || 'Failed to send notifications');
+
+            // Get start and end dates
+            const startDate = document.getElementById('projectStartDate').value;
+            const endDate = document.getElementById('projectEndDate').value;
+
+            // Validate dates
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates for the project.');
+                return;
             }
-        })
-        .catch(error => {
+
+            if (new Date(startDate) > new Date(endDate)) {
+                alert('End date cannot be earlier than start date.');
+                return;
+            }
+
+            // Get project notes and quotation file
+            const notes = document.getElementById('projectNotes').value;
+            const quotationFile = document.getElementById('quotationFile').files[0];
+            const contractFile = document.getElementById('contractFile').files[0];
+            const budgetFile = document.getElementById('budgetFile').files[0];
+
+            // Validate file types
+            if (quotationFile && !validateFileType(document.getElementById('quotationFile'), 'Quotation file')) return;
+            if (contractFile && !validateFileType(document.getElementById('contractFile'), 'Contract file')) return;
+            if (budgetFile && !validateFileType(document.getElementById('budgetFile'), 'Budget file')) return;
+
+            // Create FormData object
+            const formData = new FormData();
+            formData.append('appointment_id', currentAppointment.id);
+            formData.append('personnel', JSON.stringify(selectedPersonnel));
+            formData.append('start_date', startDate);
+            formData.append('end_date', endDate);
+            formData.append('notes', notes);
+
+            // Add the new files
+            if (quotationFile) {
+                formData.append('quotation_file', quotationFile);
+            }
+            if (contractFile) {
+                formData.append('contract_file', contractFile);
+            }
+            if (budgetFile) {
+                formData.append('budget_file', budgetFile);
+            }
+
+            // Send request to create project and assign personnel
+            const response = await fetch('./api/create_project.php', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const responseText = await response.text();
+            console.log('Create project response:', responseText); // Debug log
+
+            let projectData;
+            try {
+                projectData = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('Failed to parse response:', responseText);
+                throw new Error('Invalid server response');
+            }
+
+            if (!projectData.success) {
+                throw new Error(projectData.message || 'Project creation failed');
+            }
+
+            // Create default task categories
+            await fetch('./api/create_task_categories.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    project_id: projectData.project_id,
+                    categories: [
+                        {
+                            name: 'Project Planning and Design',
+                            description: 'Initial phase focusing on project scope definition, timeline planning, and technical design specifications.'
+                        },
+                        {
+                            name: 'Materials Selection and Procurement',
+                            description: 'Selection and acquisition of necessary materials, equipment, and resources for the project.'
+                        },
+                        {
+                            name: 'Project Execution',
+                            description: 'Implementation phase where the main project work is carried out according to specifications.'
+                        },
+                        {
+                            name: 'Maintenance and Optimization',
+                            description: 'Final phase ensuring project sustainability, performance optimization, and maintenance planning.'
+                        }
+                    ]
+                })
+            });
+
+            // Send notifications
+            const notificationData = new FormData();
+            notificationData.append('project_id', projectData.project_id.toString());
+            notificationData.append('personnel', JSON.stringify(selectedPersonnel));
+            notificationData.append('service', currentAppointment.service);
+
+            await fetch('send_project_notifications.php', {
+                method: 'POST',
+                body: notificationData
+            });
+
+            assignPersonnelModal.hide();
+            alert('Project created successfully with task categories!');
+            location.reload();
+        } catch (error) {
             console.error('Error:', error);
             alert('Error: ' + error.message);
-        });
+        }
     }
 
     function viewProject(project) {
@@ -823,6 +973,30 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             `;
         } else {
             quotationFileElement.innerHTML = '<p class="text-muted mb-0">No quotation file uploaded</p>';
+        }
+
+        // Update contract file
+        const contractFileElement = document.getElementById('modalContractFile');
+        if (project.contract_file) {
+            contractFileElement.innerHTML = `
+                <a href="../uploads/contracts/${project.contract_file}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-file-contract me-2"></i>View Contract
+                </a>
+            `;
+        } else {
+            contractFileElement.innerHTML = '<p class="text-muted mb-0">No contract file uploaded</p>';
+        }
+
+        // Update budget file
+        const budgetFileElement = document.getElementById('modalBudgetFile');
+        if (project.budget_file) {
+            budgetFileElement.innerHTML = `
+                <a href="../uploads/budgets/${project.budget_file}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-file-invoice-dollar me-2"></i>View Budget
+                </a>
+            `;
+        } else {
+            budgetFileElement.innerHTML = '<p class="text-muted mb-0">No budget file uploaded</p>';
         }
 
         // Update personnel list
@@ -926,6 +1100,19 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             console.error('Error:', error);
             alert('Failed to complete project');
         });
+    }
+
+    // Add this function to validate file types
+    function validateFileType(fileInput, fileType) {
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            if (file.type !== 'application/pdf') {
+                alert(`${fileType} must be a PDF file`);
+                fileInput.value = ''; // Clear the file input
+                return false;
+            }
+        }
+        return true;
     }
     </script>
 </body>

@@ -5,7 +5,7 @@ require_once '../../dbconnect.php';
 header('Content-Type: application/json');
 
 // Check if user is logged in and has appropriate role
-if (!isset($_SESSION['logged_in']) || !in_array($_SESSION['role'], ['admin', 'project_manager', 'technician', 'engineer', 'worker', 'client'])) {
+if (!isset($_SESSION['logged_in']) || !in_array($_SESSION['role'], ['admin', 'ceo', 'project_manager', 'technician', 'engineer', 'worker', 'client'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
     exit;
 }

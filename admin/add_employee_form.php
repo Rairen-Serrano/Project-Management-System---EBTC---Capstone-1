@@ -84,6 +84,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
                                     <label class="form-label">Role <span class="text-danger">*</span></label>
                                     <select class="form-select" name="role" id="addEmployeeRole" required>
                                         <option value="">Select Role</option>
+                                        <option value="ceo">CEO</option>
                                         <option value="project_manager">Project Manager</option>
                                         <option value="engineer">Engineer</option>
                                         <option value="technician">Technician</option>

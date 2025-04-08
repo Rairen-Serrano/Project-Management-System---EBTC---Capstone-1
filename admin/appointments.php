@@ -111,6 +111,9 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <button id="viewToggle" class="btn btn-primary me-2">
                         <i class="fas fa-calendar-alt"></i>
                     </button>
+                    <a href="confirmed_appointments.php" class="btn btn-success me-2">
+                        <i class="fas fa-check-circle me-2"></i>View Confirmed
+                    </a>
                     <a href="archived_appointments.php" class="btn btn-secondary">
                         <i class="fas fa-archive me-2"></i>View Archive
                     </a>
@@ -176,30 +179,38 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
-                                    <th style="width: 20%">Client</th>
-                                    <th style="width: 30%">Service</th>
-                                    <th style="width: 15%">Date & Time</th>
-                                    <th style="width: 15%">Status</th>
-                                    <th style="width: 10%">Actions</th>
+                                    <th style="width: 15%">Client</th>
+                                    <th style="width: 20%">Service</th>
+                                    <th style="width: 15%" class="ps-5">Date & Time</th>
+                                    <th style="width: 15%" class="text-center">Type</th>
+                                    <th style="width: 15%" class="text-center">Status</th>
+                                    <th style="width: 10%" class="text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (empty($appointments)): ?>
                                 <tr>
-                                    <td colspan="5" class="text-center py-4">No appointments found</td>
+                                    <td colspan="6" class="text-center py-4">No appointments found</td>
                                 </tr>
                                 <?php else: ?>
                                     <?php foreach ($appointments as $appointment): ?>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($appointment['client_name']); ?></td>
-                                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                        <td style="min-width: 150px;"><?php echo htmlspecialchars($appointment['client_name']); ?></td>
+                                        <td style="min-width: 200px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                             <?php echo htmlspecialchars($appointment['service']); ?>
                                         </td>
-                                        <td>
+                                        <td style="min-width: 120px;" class="ps-5">
                                             <div class="fs-6"><?php echo date('M d, Y', strtotime($appointment['date'])); ?></div>
                                             <div class="text-muted"><?php echo date('h:i A', strtotime($appointment['time'])); ?></div>
                                         </td>
-                                        <td>
+                                        <td style="min-width: 120px;" class="text-center">
+                                            <?php if ($appointment['appointment_type'] === 'face-to-face'): ?>
+                                                <span class="badge bg-primary">Face-to-Face</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-info">Online</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td style="min-width: 100px;" class="text-center">
                                             <?php
                                             $statusClass = '';
                                             switch($appointment['status']) {
@@ -215,8 +226,9 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 <?php echo ucfirst($appointment['status']); ?>
                                             </span>
                                         </td>
-                                        <td class="text-center">
-                                            <button type="button" class="btn btn-sm btn-info" onclick='viewAppointment(<?php echo json_encode($appointment); ?>)'>
+                                        <td class="actions-cell" style="min-width: 100px;">
+                                            <button type="button" class="btn btn-sm btn-info btn-action" 
+                                                    onclick='viewAppointment(<?php echo json_encode($appointment); ?>)'>
                                                 <i class="fas fa-eye"></i>
                                             </button>
                                         </td>
@@ -259,6 +271,7 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <p><strong>Service:</strong> <span id="modalService"></span></p>
                             <p><strong>Date:</strong> <span id="modalDate"></span></p>
                             <p><strong>Time:</strong> <span id="modalTime"></span></p>
+                            <p><strong>Type:</strong> <span id="modalType"></span></p>
                             <p><strong>Status:</strong> <span id="modalStatus"></span></p>
                             <p><strong>Created:</strong> <span id="modalCreated"></span></p>
                         </div>
@@ -295,6 +308,11 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     .status-badge.cancelled {
         background-color: #dc3545;
+        color: #fff;
+    }
+
+    .status-badge.confirmed {
+        background-color: #198754;
         color: #fff;
     }
 
@@ -346,6 +364,43 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         background-color: rgba(var(--bs-primary-rgb), 0.1) !important;
         border: 2px solid var(--bs-primary) !important;
     }
+
+    /* Table styling */
+    .table th {
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .table td {
+        vertical-align: middle;
+    }
+
+    .btn-action {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    /* Ensure consistent button sizing */
+    .btn-sm {
+        min-width: 32px;
+        min-height: 32px;
+    }
+
+    /* Fix action column alignment */
+    .actions-cell {
+        text-align: center;
+        vertical-align: middle !important;
+        white-space: nowrap;
+    }
     </style>
 
     <script>
@@ -358,9 +413,21 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         document.getElementById('modalDate').textContent = new Date(appointment.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         document.getElementById('modalTime').textContent = new Date('2000-01-01 ' + appointment.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
         
+        // Update appointment type without icon
+        const typeText = appointment.appointment_type === 'face-to-face' ? 'Face-to-Face' : 'Online';
+        document.getElementById('modalType').innerHTML = typeText;
+        
         // Update status with badge
         const statusText = appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1);
-        const statusClass = appointment.status === 'pending' ? 'pending' : 'cancelled';
+        let statusClass = '';
+        switch(appointment.status) {
+            case 'pending':
+                statusClass = 'pending';
+                break;
+            case 'cancelled':
+                statusClass = 'cancelled';
+                break;
+        }
         document.getElementById('modalStatus').innerHTML = `<span class="status-badge ${statusClass}">${statusText}</span>`;
         
         document.getElementById('modalCreated').textContent = new Date(appointment.created_at).toLocaleString();
@@ -428,13 +495,26 @@ $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             $dateTime = date('Y-m-d', strtotime($appointment['date'])) . 'T' . 
                        date('H:i:s', strtotime($appointment['time']));
             
+            // Set color based on status
+            $backgroundColor = '';
+            $textColor = '#fff';
+            switch($appointment['status']) {
+                case 'pending':
+                    $backgroundColor = '#ffc107';
+                    $textColor = '#000';
+                    break;
+                case 'cancelled':
+                    $backgroundColor = '#dc3545';
+                    break;
+            }
+            
             return [
                 'id' => $appointment['appointment_id'],
                 'title' => date('h:i A', strtotime($appointment['time'])) . ' - ' . $appointment['client_name'],
                 'start' => $dateTime,
-                'backgroundColor' => $appointment['status'] === 'pending' ? '#ffc107' : '#dc3545',
-                'borderColor' => $appointment['status'] === 'pending' ? '#ffc107' : '#dc3545',
-                'textColor' => $appointment['status'] === 'pending' ? '#000' : '#fff',
+                'backgroundColor' => $backgroundColor,
+                'borderColor' => $backgroundColor,
+                'textColor' => $textColor,
                 'extendedProps' => $appointment
             ];
         }, $appointments)); ?>;

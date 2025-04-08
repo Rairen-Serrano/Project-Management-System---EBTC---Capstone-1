@@ -103,6 +103,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 case 'worker':
                     header('Location: worker/dashboard.php');
                     break;
+                case 'ceo':
+                    header('Location: ceo/dashboard.php');
+                    break;
                 default:
                     error_log("Redirecting to index");
                     header('Location: index.php');

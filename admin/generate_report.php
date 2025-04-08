@@ -96,20 +96,122 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
         </div>
     </div>
 
+    <!-- Add this modal before the closing body tag -->
+    <div class="modal fade" id="pinVerificationModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Security Verification</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-center mb-4">Please enter your 4-digit PIN to generate the report.</p>
+                    <div class="pin-input-group">
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                        <input type="password" class="pin-input" maxlength="1" pattern="[0-9]" required>
+                    </div>
+                    <div id="pinError" class="text-danger text-center mt-2" style="display: none;">
+                        Invalid PIN. Please try again.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="verifyPinBtn">Verify PIN</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update the JavaScript section -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         const excelForm = document.querySelector('form[action="generate_excel.php"]');
+        const pdfForm = document.querySelector('form[action="generate_pdf.php"]');
+        const pinModal = new bootstrap.Modal(document.getElementById('pinVerificationModal'));
+        const pinInputs = document.querySelectorAll('#pinVerificationModal .pin-input');
+        const verifyPinBtn = document.getElementById('verifyPinBtn');
         
-        excelForm.addEventListener('submit', function(e) {
-            const reportType = this.querySelector('select[name="report_type"]').value;
-            console.log('Submitting Excel report form with type:', reportType);
+        let currentForm = null;
+
+        // Prevent direct form submissions
+        excelForm.addEventListener('submit', handleFormSubmit);
+        pdfForm.addEventListener('submit', handleFormSubmit);
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            currentForm = e.target;
+            // Clear previous PIN inputs
+            pinInputs.forEach(input => {
+                input.value = '';
+            });
+            pinInputs[0].focus();
+            document.getElementById('pinError').style.display = 'none';
+            pinModal.show();
+        }
+
+        // Handle PIN input navigation
+        pinInputs.forEach((input, index) => {
+            input.addEventListener('keyup', function(e) {
+                if (e.key >= '0' && e.key <= '9') {
+                    if (index < pinInputs.length - 1) {
+                        pinInputs[index + 1].focus();
+                    }
+                } else if (e.key === 'Backspace') {
+                    if (index > 0) {
+                        pinInputs[index - 1].focus();
+                    }
+                }
+            });
+        });
+
+        // Handle PIN verification
+        verifyPinBtn.addEventListener('click', function() {
+            const pin = Array.from(pinInputs).map(input => input.value).join('');
             
-            // Add a hidden field with timestamp to prevent caching
-            const timestampField = document.createElement('input');
-            timestampField.type = 'hidden';
-            timestampField.name = 'timestamp';
-            timestampField.value = new Date().getTime();
-            this.appendChild(timestampField);
+            if (pin.length !== 4) {
+                document.getElementById('pinError').style.display = 'block';
+                return;
+            }
+
+            fetch('../api/auth/verify_pin.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ pin: pin })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    pinModal.hide();
+                    
+                    // Add verified PIN to the form
+                    const pinField = document.createElement('input');
+                    pinField.type = 'hidden';
+                    pinField.name = 'verified_pin';
+                    pinField.value = pin;
+                    currentForm.appendChild(pinField);
+
+                    // Submit the form
+                    currentForm.submit();
+                } else {
+                    document.getElementById('pinError').textContent = data.message || 'Invalid PIN. Please try again.';
+                    document.getElementById('pinError').style.display = 'block';
+                    
+                    // Clear PIN inputs
+                    pinInputs.forEach(input => {
+                        input.value = '';
+                    });
+                    pinInputs[0].focus();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('pinError').textContent = 'An error occurred. Please try again.';
+                document.getElementById('pinError').style.display = 'block';
+            });
         });
     });
     </script>

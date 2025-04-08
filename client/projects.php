@@ -18,6 +18,8 @@ $stmt = $pdo->prepare("
         p.notes,
         p.status,
         p.quotation_file,
+        p.contract_file,
+        p.budget_file,
         GROUP_CONCAT(DISTINCT CONCAT(u.name, '|', u.role, '|', u.email, '|', u.phone) SEPARATOR '||') as assigned_personnel,
         (
             SELECT COUNT(*) 
@@ -254,17 +256,47 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
 
-                                        <!-- Quotation File -->
+                                        <!-- Project Files Section -->
                                         <div class="col-12">
                                             <div class="card">
                                                 <div class="card-header">
-                                                    <h5 class="card-title mb-0">Quotation File</h5>
-                                    </div>
-                                                <div class="card-body" id="projectQuotation">
-                                                    <!-- Quotation file will be loaded here -->
-                                </div>
-                            </div>
-                        </div>
+                                                    <h5 class="card-title mb-0">Project Files</h5>
+                                                </div>
+                                                <div class="card-body">
+                                                    <div class="row g-3">
+                                                        <!-- Quotation File -->
+                                                        <div class="col-md-4">
+                                                            <div class="border rounded p-3">
+                                                                <h6 class="mb-3">Quotation File</h6>
+                                                                <div id="projectQuotation">
+                                                                    <!-- Quotation file will be loaded here -->
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <!-- Contract File -->
+                                                        <div class="col-md-4">
+                                                            <div class="border rounded p-3">
+                                                                <h6 class="mb-3">Contract File</h6>
+                                                                <div id="projectContract">
+                                                                    <!-- Contract file will be loaded here -->
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <!-- Budget File -->
+                                                        <div class="col-md-4">
+                                                            <div class="border rounded p-3">
+                                                                <h6 class="mb-3">Budget/Costing File</h6>
+                                                                <div id="projectBudget">
+                                                                    <!-- Budget file will be loaded here -->
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
 
                                         <!-- Project Progress -->
                         <div class="col-12">
@@ -363,8 +395,8 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     // Update tasks
                     updateTasks(data.tasks);
 
-                    // Update quotation
-                    updateQuotation(data.project.quotation_file);
+                    // Update project files
+                    updateProjectFiles(data.project);
                 })
                 .catch(error => {
                     console.error('Fetch Error:', error);
@@ -525,20 +557,53 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             });
         }
 
-        function updateQuotation(quotationFile) {
+        function updateProjectFiles(project) {
+            // Update Quotation File
             const quotationSection = document.getElementById('projectQuotation');
-            if (quotationFile) {
+            if (project.quotation_file) {
                 quotationSection.innerHTML = `
                     <div class="d-flex align-items-center">
                         <i class="fas fa-file-pdf text-danger me-2"></i>
-                        <a href="../uploads/quotations/${quotationFile}" 
+                        <a href="../uploads/quotations/${project.quotation_file}" 
                            target="_blank" class="text-decoration-none">
                             View Quotation
                         </a>
                     </div>
                 `;
             } else {
-                quotationSection.innerHTML = '<p class="text-muted">No quotation file available</p>';
+                quotationSection.innerHTML = '<p class="text-muted mb-0">No quotation file available</p>';
+            }
+
+            // Update Contract File
+            const contractSection = document.getElementById('projectContract');
+            if (project.contract_file) {
+                contractSection.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-file-contract text-primary me-2"></i>
+                        <a href="../uploads/contracts/${project.contract_file}" 
+                           target="_blank" class="text-decoration-none">
+                            View Contract
+                        </a>
+                    </div>
+                `;
+            } else {
+                contractSection.innerHTML = '<p class="text-muted mb-0">No contract file available</p>';
+            }
+
+            // Update Budget File
+            const budgetSection = document.getElementById('projectBudget');
+            if (project.budget_file) {
+                budgetSection.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-file-invoice-dollar text-success me-2"></i>
+                        <a href="../uploads/budgets/${project.budget_file}" 
+                           target="_blank" class="text-decoration-none">
+                            View Budget
+                        </a>
+                    </div>
+                `;
+            } else {
+                budgetSection.innerHTML = '<p class="text-muted mb-0">No budget file available</p>';
             }
         }
 

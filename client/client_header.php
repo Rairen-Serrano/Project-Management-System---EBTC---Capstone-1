@@ -4,6 +4,11 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'client') {
     header('Location: ../index.php');
     exit;
 }
+
+// Get unread notifications count
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND is_read = 0");
+$stmt->execute([$_SESSION['user_id']]);
+$unread_count = $stmt->fetchColumn();
 ?>
 
 <!-- Header -->
@@ -28,17 +33,17 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'client') {
 
             <div class="collapse navbar-collapse" id="clientNavbarContent">
                 <ul class="navbar-nav ms-auto align-items-center">
-                    <!-- Notifications Dropdown -->
-                    <li class="nav-item dropdown me-3">
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="#">New message from admin</a></li>
-                            <li><a class="dropdown-item" href="#">Project status updated</a></li>
-                            <li><a class="dropdown-item" href="#">Document approved</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-center" href="#">View all notifications</a></li>
-                        </ul>
+                    <!-- Notifications -->
+                    <li class="nav-item me-3 position-relative">
+                        <a href="notifications.php" class="nav-link text-white">
+                            <i class="fas fa-bell"></i>
+                            <?php if ($unread_count > 0): ?>
+                                <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
+                                    <span class="visually-hidden">Unread notifications</span>
+                                </span>
+                            <?php endif; ?>
+                        </a>
                     </li>
-
                     <!-- User Name Display -->
                     <li class="nav-item">
                         <span class="nav-link text-white">
@@ -62,10 +67,6 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'client') {
         <a href="projects.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'projects.php' ? 'active' : ''; ?>">
             <i class="fas fa-project-diagram"></i>
             My Projects
-        </a>
-        <a href="notifications.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'notifications.php' ? 'active' : ''; ?>">
-            <i class="fas fa-bell"></i>
-            Notifications
         </a>
         <a href="profile.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : ''; ?>">
             <i class="fas fa-user"></i>

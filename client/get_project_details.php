@@ -12,30 +12,46 @@ ob_clean();
 // Set headers
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'client' || !isset($_GET['project_id'])) {
-    http_response_code(403);
-    exit('Unauthorized');
+if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'client') {
+    die(json_encode(['error' => 'Unauthorized access']));
+}
+
+if (!isset($_GET['project_id'])) {
+    die(json_encode(['error' => 'Project ID is required']));
 }
 
 try {
-    // Get project details
+    // Update the query to include contract_file and budget_file
     $stmt = $pdo->prepare("
         SELECT 
             p.*,
-            GROUP_CONCAT(DISTINCT CONCAT(u.name, '|', u.role, '|', u.email, '|', u.phone) SEPARATOR '||') as assigned_personnel
+            GROUP_CONCAT(DISTINCT CONCAT(u.name, '|', u.role, '|', u.email, '|', u.phone) SEPARATOR '||') as assigned_personnel,
+            (
+                SELECT COUNT(*) 
+                FROM tasks t 
+                WHERE t.project_id = p.project_id AND t.status = 'completed'
+            ) as completed_tasks,
+            (
+                SELECT COUNT(*) 
+                FROM tasks t 
+                WHERE t.project_id = p.project_id
+            ) as total_tasks
         FROM projects p
         LEFT JOIN project_assignees pa ON p.project_id = pa.project_id
         LEFT JOIN users u ON pa.user_id = u.user_id
         WHERE p.project_id = ? AND p.client_id = ?
         GROUP BY p.project_id
     ");
+
     $stmt->execute([$_GET['project_id'], $_SESSION['user_id']]);
     $project = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$project) {
-        http_response_code(404);
-        exit('Project not found');
+        die(json_encode(['error' => 'Project not found']));
     }
+
+    // Debug: Log the project data
+    error_log('Project data: ' . print_r($project, true));
 
     // Get project categories
     $categoryStmt = $pdo->prepare("
@@ -98,8 +114,10 @@ try {
             'notes' => $project['notes'],
             'status' => $project['status'],
             'quotation_file' => $project['quotation_file'],
-            'completed_tasks' => count($completedTasks),
-            'total_tasks' => count($tasks)
+            'contract_file' => $project['contract_file'],
+            'budget_file' => $project['budget_file'],
+            'completed_tasks' => $project['completed_tasks'],
+            'total_tasks' => $project['total_tasks']
         ],
         'personnel' => $personnel,
         'categories' => $categories,
@@ -111,7 +129,6 @@ try {
     exit;
 
 } catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Server error']);
-    exit;
+    error_log('Error in get_project_details.php: ' . $e->getMessage());
+    die(json_encode(['error' => 'An error occurred while fetching project details']));
 } 

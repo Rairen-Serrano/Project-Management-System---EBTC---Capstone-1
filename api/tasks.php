@@ -194,12 +194,13 @@ if ($action === 'complete_category') {
         
         $category_id = $_GET['category_id'];
         
-        // First, check if all tasks in this category are completed
+        // First, check if all non-archived tasks in this category are completed
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as incomplete_tasks 
             FROM tasks 
             WHERE category_id = ? 
             AND status != 'completed'
+            AND (is_archived = 0 OR is_archived IS NULL)
         ");
         $stmt->execute([$category_id]);
         $result = $stmt->fetch();
@@ -536,6 +537,375 @@ if ($action === 'delete_task') {
 
     } catch (Exception $e) {
         error_log("Error deleting task: " . $e->getMessage());
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+    exit;
+}
+
+// Add this new case for archiving tasks
+if ($action === 'archive_task') {
+    try {
+        $data = json_decode(file_get_contents('php://input'), true);
+        if (!isset($data['task_id'])) {
+            throw new Exception('Task ID is required');
+        }
+
+        // First get task details and assignees before archiving
+        $task_stmt = $pdo->prepare("
+            SELECT t.task_name, t.project_id, GROUP_CONCAT(ta.user_id) as assignee_ids
+            FROM tasks t
+            LEFT JOIN task_assignees ta ON t.task_id = ta.task_id
+            WHERE t.task_id = ?
+            GROUP BY t.task_id
+        ");
+        $task_stmt->execute([$data['task_id']]);
+        $task_info = $task_stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$task_info) {
+            throw new Exception('Task not found');
+        }
+
+        // Update task to archived status
+        $stmt = $pdo->prepare("
+            UPDATE tasks 
+            SET is_archived = 1 
+            WHERE task_id = ? AND project_id = ?
+        ");
+        $stmt->execute([$data['task_id'], $project_id]);
+
+        if ($stmt->rowCount() === 0) {
+            throw new Exception('Task not found or already archived');
+        }
+
+        // Get project name
+        $project_stmt = $pdo->prepare("SELECT service FROM projects WHERE project_id = ?");
+        $project_stmt->execute([$project_id]);
+        $project = $project_stmt->fetch(PDO::FETCH_ASSOC);
+
+        // Get assigner's name
+        $assigner_stmt = $pdo->prepare("SELECT name FROM users WHERE user_id = ?");
+        $assigner_stmt->execute([$_SESSION['user_id']]);
+        $assigner = $assigner_stmt->fetch(PDO::FETCH_ASSOC);
+
+        // Send notifications to assignees
+        if ($task_info['assignee_ids']) {
+            $assignees = explode(',', $task_info['assignee_ids']);
+            $notification_stmt = $pdo->prepare("
+                INSERT INTO notifications (
+                    user_id,
+                    recipient_id,
+                    type,
+                    reference_id,
+                    title,
+                    message,
+                    is_read,
+                    created_at
+                ) VALUES (?, ?, 'task_archived', ?, ?, ?, FALSE, NOW())
+            ");
+
+            $title = "Task Archived";
+            $message = "Task '{$task_info['task_name']}' in project '{$project['service']}' has been archived by {$assigner['name']}.";
+
+            foreach ($assignees as $assignee_id) {
+                if ($assignee_id != $_SESSION['user_id']) { // Don't notify the archiver
+                    $notification_stmt->execute([
+                        $_SESSION['user_id'],
+                        $assignee_id,
+                        $data['task_id'],
+                        $title,
+                        $message
+                    ]);
+                }
+            }
+        }
+
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Task archived successfully'
+        ]);
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false, 
+            'error' => $e->getMessage()
+        ]);
+    }
+    exit;
+}
+
+// Modify the existing tasks fetching query in the get_tasks case to exclude archived tasks
+if ($action === 'tasks') {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 
+                t.*,
+                tc.category_name,
+                GROUP_CONCAT(DISTINCT CONCAT(u.user_id, ':', u.name) SEPARATOR ',') as assigned_users
+            FROM tasks t
+            LEFT JOIN task_categories tc ON t.category_id = tc.category_id
+            LEFT JOIN task_assignees ta ON t.task_id = ta.task_id
+            LEFT JOIN users u ON ta.user_id = u.user_id
+            WHERE t.project_id = ? 
+            AND (t.is_archived = 0 OR t.is_archived IS NULL)
+            GROUP BY t.task_id
+            ORDER BY t.due_date ASC
+        ");
+        
+        $stmt->execute([$project_id]);
+        $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Process tasks to include assignees
+        foreach ($tasks as &$task) {
+            // Get assignees for each task
+            $assignee_stmt = $pdo->prepare("
+                SELECT 
+                    u.user_id,
+                    u.name,
+                    u.role
+                FROM task_assignees ta
+                JOIN users u ON ta.user_id = u.user_id
+                WHERE ta.task_id = ?
+            ");
+            $assignee_stmt->execute([$task['task_id']]);
+            $task['assignees'] = $assignee_stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        echo json_encode([
+            'success' => true,
+            'tasks' => $tasks
+        ]);
+    } catch (Exception $e) {
+        error_log("Error fetching tasks: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+    exit;
+}
+
+// Add this new case for getting archived tasks
+if ($action === 'archived_tasks') {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 
+                t.*,
+                tc.category_name,
+                tc.status as category_status,
+                GROUP_CONCAT(DISTINCT CONCAT(u.user_id, ':', u.name) SEPARATOR ',') as assigned_users
+            FROM tasks t
+            LEFT JOIN task_categories tc ON t.category_id = tc.category_id
+            LEFT JOIN task_assignees ta ON t.task_id = ta.task_id
+            LEFT JOIN users u ON ta.user_id = u.user_id
+            WHERE t.project_id = ? 
+            AND t.is_archived = 1
+            GROUP BY t.task_id
+            ORDER BY t.due_date ASC
+        ");
+        
+        $stmt->execute([$project_id]);
+        $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Process tasks to include assignees
+        foreach ($tasks as &$task) {
+            $assignee_stmt = $pdo->prepare("
+                SELECT 
+                    u.user_id,
+                    u.name,
+                    u.role
+                FROM task_assignees ta
+                JOIN users u ON ta.user_id = u.user_id
+                WHERE ta.task_id = ?
+                AND EXISTS (
+                    SELECT 1 FROM tasks t 
+                    WHERE t.task_id = ta.task_id 
+                    AND t.project_id = ?
+                )
+            ");
+            $assignee_stmt->execute([$task['task_id'], $project_id]);
+            $task['assignees'] = $assignee_stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        echo json_encode([
+            'success' => true,
+            'tasks' => $tasks
+        ]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+    exit;
+}
+
+// Add this new case for returning tasks
+if ($action === 'return_task') {
+    try {
+        $data = json_decode(file_get_contents('php://input'), true);
+        if (!isset($data['task_id'])) {
+            throw new Exception('Task ID is required');
+        }
+
+        // Update task to remove archived status
+        $stmt = $pdo->prepare("
+            UPDATE tasks 
+            SET is_archived = 0 
+            WHERE task_id = ? AND project_id = ?
+        ");
+        $stmt->execute([$data['task_id'], $project_id]);
+
+        if ($stmt->rowCount() === 0) {
+            throw new Exception('Task not found or already returned');
+        }
+
+        // Get task details for notification
+        $task_stmt = $pdo->prepare("
+            SELECT t.task_name, GROUP_CONCAT(ta.user_id) as assignee_ids
+            FROM tasks t
+            LEFT JOIN task_assignees ta ON t.task_id = ta.task_id
+            WHERE t.task_id = ?
+            GROUP BY t.task_id
+        ");
+        $task_stmt->execute([$data['task_id']]);
+        $task_info = $task_stmt->fetch(PDO::FETCH_ASSOC);
+
+        // Send notifications to assignees about the returned task
+        if ($task_info && $task_info['assignee_ids']) {
+            $assignees = explode(',', $task_info['assignee_ids']);
+            $notification_stmt = $pdo->prepare("
+                INSERT INTO notifications (
+                    user_id,
+                    recipient_id,
+                    type,
+                    reference_id,
+                    title,
+                    message,
+                    is_read,
+                    created_at
+                ) VALUES (?, ?, 'task_returned', ?, ?, ?, FALSE, NOW())
+            ");
+
+            $title = "Task Returned";
+            $message = "Task '{$task_info['task_name']}' has been returned to active tasks.";
+
+            foreach ($assignees as $assignee_id) {
+                if ($assignee_id != $_SESSION['user_id']) {
+                    $notification_stmt->execute([
+                        $_SESSION['user_id'],
+                        $assignee_id,
+                        $data['task_id'],
+                        $title,
+                        $message
+                    ]);
+                }
+            }
+        }
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Task returned successfully'
+        ]);
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+    exit;
+}
+
+// Add this new case for checking category status
+if ($action === 'check_category_status') {
+    try {
+        if (!isset($_GET['task_id'])) {
+            throw new Exception('Task ID is required');
+        }
+
+        $task_id = $_GET['task_id'];
+
+        // Get the category status for the task
+        $stmt = $pdo->prepare("
+            SELECT tc.status as category_status
+            FROM tasks t
+            JOIN task_categories tc ON t.category_id = tc.category_id
+            WHERE t.task_id = ?
+        ");
+        $stmt->execute([$task_id]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$result) {
+            throw new Exception('Task or category not found');
+        }
+
+        echo json_encode([
+            'success' => true,
+            'is_category_completed' => ($result['category_status'] === 'completed')
+        ]);
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+    exit;
+}
+
+// Get task details
+if ($action === 'get_task_details') {
+    try {
+        if (!isset($_GET['task_id'])) {
+            throw new Exception('Task ID is required');
+        }
+
+        $task_id = $_GET['task_id'];
+
+        // Get task details with category information
+        $stmt = $pdo->prepare("
+            SELECT 
+                t.*,
+                tc.category_id,
+                tc.category_name,
+                tc.status as category_status
+            FROM tasks t
+            LEFT JOIN task_categories tc ON t.category_id = tc.category_id
+            WHERE t.task_id = ?
+        ");
+        $stmt->execute([$task_id]);
+        $task = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$task) {
+            throw new Exception('Task not found');
+        }
+
+        // Get assignees for the task
+        $assignee_stmt = $pdo->prepare("
+            SELECT 
+                u.user_id,
+                u.name,
+                u.role
+            FROM task_assignees ta
+            JOIN users u ON ta.user_id = u.user_id
+            WHERE ta.task_id = ?
+        ");
+        $assignee_stmt->execute([$task_id]);
+        $task['assignees'] = $assignee_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'success' => true,
+            'task' => $task
+        ]);
+
+    } catch (Exception $e) {
+        error_log("Error getting task details: " . $e->getMessage());
+        http_response_code(400);
         echo json_encode([
             'success' => false,
             'error' => $e->getMessage()

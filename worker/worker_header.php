@@ -4,6 +4,11 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'worker') {
     header('Location: ../admin_login.php');
     exit;
 }
+
+// Get unread notifications count
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND is_read = 0");
+$stmt->execute([$_SESSION['user_id']]);
+$unread_count = $stmt->fetchColumn();
 ?>
 
 <!-- Header -->
@@ -25,6 +30,17 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'worker') {
 
             <div class="collapse navbar-collapse" id="engineerNavbarContent">
                 <ul class="navbar-nav ms-auto align-items-center">
+                    <!-- Notifications -->
+                    <li class="nav-item me-3 position-relative">
+                        <a href="notifications.php" class="nav-link text-white">
+                            <i class="fas fa-bell"></i>
+                            <?php if ($unread_count > 0): ?>
+                                <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
+                                    <span class="visually-hidden">Unread notifications</span>
+                                </span>
+                            <?php endif; ?>
+                        </a>
+                    </li>
                     <!-- User Name Display -->
                     <li class="nav-item">
                         <span class="nav-link text-white">
@@ -52,10 +68,6 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'worker') {
         <a href="tasks.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'tasks.php' ? 'active' : ''; ?>">
             <i class="fas fa-tasks"></i>
             Tasks
-        </a>
-        <a href="notifications.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'notifications.php' ? 'active' : ''; ?>">
-            <i class="fas fa-bell"></i>
-            Notifications
         </a>
         <a href="profile.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : ''; ?>">
             <i class="fas fa-user"></i>

@@ -62,6 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $date = $_POST['date'] ?? '';
         $time = $_POST['time'] ?? '';
         $services = isset($_POST['service']) ? (array)$_POST['service'] : [];
+        $appointment_type = $_POST['appointment_type'] ?? '';
 
         // Validate inputs
         if (empty($date)) {
@@ -92,25 +93,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Convert service array to string if it's an array
-        $servicesString = is_array($services) ? implode(', ', $services) : $services;
+        $servicesString = is_array($services) ? implode(', ', array_map(function($service) {
+            return trim($service, '[]"'); // Remove brackets and quotes
+        }, $services)) : $services;
 
         // If time slot is available, proceed with booking
-        $stmt = $pdo->prepare("
-            INSERT INTO appointments (
-                client_id, 
-                date, 
-                time, 
-                service, 
-                status, 
-                created_at
-            ) VALUES (?, ?, ?, ?, 'pending', NOW())
-        ");
+        $sql = "INSERT INTO appointments (
+            client_id,
+            service, 
+            date, 
+            time,
+            appointment_type,
+            status,
+            created_at,
+            updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'pending', NOW(), NOW())";
 
+        $stmt = $pdo->prepare($sql);
         $stmt->execute([
             $_SESSION['user_id'],
+            $servicesString, // Store as plain string instead of JSON
             $date,
             $time,
-            $servicesString,
+            $appointment_type
         ]);
 
         $appointmentId = $pdo->lastInsertId();

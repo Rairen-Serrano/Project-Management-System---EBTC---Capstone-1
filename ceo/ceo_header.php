@@ -1,6 +1,6 @@
 <?php
 // Ensure this file is included in a valid context
-if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'project_manager') {
+if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
     header('Location: ../admin_login.php');
     exit;
 }
@@ -12,7 +12,7 @@ $unread_count = $stmt->fetchColumn();
 ?>
 
 <!-- Header -->
-<header class="manager-header">
+<header class="engineer-header">
     <nav class="navbar navbar-expand-lg">
         <div class="container-fluid px-4">
             <div class="d-flex align-items-center">
@@ -24,11 +24,11 @@ $unread_count = $stmt->fetchColumn();
             </div>
 
             <!-- Mobile Toggle Button -->
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#managerNavbarContent">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#engineerNavbarContent">
                 <i class="fas fa-bars text-white"></i>
             </button>
 
-            <div class="collapse navbar-collapse" id="managerNavbarContent">
+            <div class="collapse navbar-collapse" id="engineerNavbarContent">
                 <ul class="navbar-nav ms-auto align-items-center">
                     <!-- Notifications -->
                     <li class="nav-item me-3 position-relative">
@@ -55,27 +55,23 @@ $unread_count = $stmt->fetchColumn();
 </header>
 
 <!-- Sidebar -->
-<nav class="manager-sidebar">
-    <div class="manager-sidebar-menu">
+<nav class="engineer-sidebar">
+    <div class="sidebar-menu">
         <a href="dashboard.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : ''; ?>">
             <i class="fas fa-tachometer-alt"></i>
             Dashboard
         </a>
-        <a href="projects.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'projects.php' ? 'active' : ''; ?>">
+        <a href="project_overview.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'project_overview.php' ? 'active' : ''; ?>">
             <i class="fas fa-project-diagram"></i>
-            Projects
+            Project Overview
         </a>
-        <a href="team_members.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'team_members.php' ? 'active' : ''; ?>">
+        <a href="employee_status.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'employee_status.php' ? 'active' : ''; ?>">
             <i class="fas fa-users"></i>
-            Team Members
-        </a>
-        <a href="settings.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active' : ''; ?>">
-            <i class="fas fa-cog"></i>
-            Settings
+            Employee Status
         </a>
         <a href="../logout.php">
             <i class="fas fa-sign-out-alt"></i>
             Logout
         </a>
     </div>
-</nav>
+</nav> 

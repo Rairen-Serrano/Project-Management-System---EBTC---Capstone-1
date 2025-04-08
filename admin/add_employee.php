@@ -41,7 +41,7 @@ try {
     }
 
     // Validate role
-    $allowed_roles = ['project_manager', 'engineer', 'technician', 'worker'];
+    $allowed_roles = ['ceo', 'project_manager', 'engineer', 'technician', 'worker'];
     if (!in_array($_POST['role'], $allowed_roles)) {
         throw new Exception('Invalid role selected');
     }

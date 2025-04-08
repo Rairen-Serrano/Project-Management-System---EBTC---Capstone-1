@@ -16,8 +16,22 @@ use \TCPDF as TCPDF;
 
 // Check if user is logged in and is an admin
 if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'admin') {
-    header('Location: ../admin_login.php');
-    exit;
+    die('Unauthorized access');
+}
+
+// Verify PIN again for security
+if (!isset($_POST['verified_pin'])) {
+    die('PIN verification required');
+}
+
+// Get the stored hashed PIN
+$stmt = $pdo->prepare("SELECT pin_code FROM users WHERE user_id = ?");
+$stmt->execute([$_SESSION['user_id']]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Verify the PIN using password_verify
+if (!password_verify($_POST['verified_pin'], $user['pin_code'])) {
+    die('Invalid PIN');
 }
 
 try {

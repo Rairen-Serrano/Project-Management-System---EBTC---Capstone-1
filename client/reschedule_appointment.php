@@ -10,15 +10,15 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'client') {
     exit;
 }
 
-// Check if all required fields are present
-if (!isset($_POST['appointment_id']) || !isset($_POST['new_date']) || !isset($_POST['new_time'])) {
-    echo json_encode(['success' => false, 'message' => 'Missing required fields']);
-    exit;
-}
+// Get POST data
+$appointmentId = $_POST['appointment_id'] ?? '';
+$newDate = $_POST['new_date'] ?? '';
+$newTime = $_POST['new_time'] ?? '';
+$pin = $_POST['pin'] ?? '';
 
-// Add after your existing checks
-if (!isset($_POST['pin'])) {
-    echo json_encode(['success' => false, 'message' => 'PIN is required']);
+// Check if all required fields are present
+if (empty($appointmentId) || empty($newDate) || empty($newTime) || empty($pin)) {
+    echo json_encode(['success' => false, 'message' => 'Missing required fields']);
     exit;
 }
 
@@ -27,7 +27,7 @@ $stmt = $pdo->prepare("SELECT pin_code FROM users WHERE user_id = ?");
 $stmt->execute([$_SESSION['user_id']]);
 $user = $stmt->fetch();
 
-if (!password_verify($_POST['pin'], $user['pin_code'])) {
+if (!password_verify($pin, $user['pin_code'])) {
     echo json_encode(['success' => false, 'message' => 'Invalid PIN']);
     exit;
 }
@@ -35,7 +35,7 @@ if (!password_verify($_POST['pin'], $user['pin_code'])) {
 try {
     // Get the appointment to verify ownership and status
     $stmt = $pdo->prepare("SELECT * FROM appointments WHERE appointment_id = ? AND client_id = ?");
-    $stmt->execute([$_POST['appointment_id'], $_SESSION['user_id']]);
+    $stmt->execute([$appointmentId, $_SESSION['user_id']]);
     $appointment = $stmt->fetch();
 
     if (!$appointment) {
@@ -58,7 +58,7 @@ try {
         AND status != 'cancelled'
         AND client_id != ?
     ");
-    $stmt->execute([$_POST['new_date'], $_POST['new_time'], $_POST['appointment_id'], $_SESSION['user_id']]);
+    $stmt->execute([$newDate, $newTime, $appointmentId, $_SESSION['user_id']]);
     $exists = $stmt->fetchColumn();
 
     if ($exists > 0) {
@@ -67,7 +67,7 @@ try {
     }
 
     // Validate new date and time
-    $newDateTime = new DateTime($_POST['new_date'] . ' ' . $_POST['new_time']);
+    $newDateTime = new DateTime($newDate . ' ' . $newTime);
     $now = new DateTime();
 
     if ($newDateTime <= $now) {
@@ -75,13 +75,15 @@ try {
         exit;
     }
 
-    // Update appointment date and time
-    $stmt = $pdo->prepare("UPDATE appointments SET date = ?, time = ?, updated_at = NOW() WHERE appointment_id = ?");
-    $stmt->execute([
-        $_POST['new_date'],
-        $_POST['new_time'],
-        $_POST['appointment_id']
-    ]);
+    // Update appointment
+    $stmt = $pdo->prepare("
+        UPDATE appointments 
+        SET date = ?, 
+            time = ?, 
+            updated_at = NOW() 
+        WHERE appointment_id = ?
+    ");
+    $stmt->execute([$newDate, $newTime, $appointmentId]);
 
     echo json_encode([
         'success' => true, 

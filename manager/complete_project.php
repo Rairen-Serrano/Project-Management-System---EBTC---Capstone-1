@@ -3,6 +3,7 @@ session_start();
 require_once '../dbconnect.php';
 require_once '../vendor/autoload.php';
 require_once '../config/mail_config.php';
+require_once '../vendor/tecnickcom/tcpdf/tcpdf.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
@@ -23,12 +24,123 @@ if (!isset($_POST['project_id'])) {
     exit;
 }
 
-function sendCompletionEmail($to, $clientName, $projectName) {
+function generateProjectSummaryPDF($pdo, $projectId, $projectInfo) {
+    // Create new PDF document
+    $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+
+    // Set document information
+    $pdf->SetCreator('EBTC PMS');
+    $pdf->SetAuthor('EBTC Project Management');
+    $pdf->SetTitle('Project Completion Summary');
+
+    // Remove default header/footer
+    $pdf->setPrintHeader(false);
+    $pdf->setPrintFooter(false);
+
+    // Set margins
+    $pdf->SetMargins(15, 15, 15);
+
+    // Add a page
+    $pdf->AddPage();
+
+    // Set font
+    $pdf->SetFont('helvetica', '', 12);
+
+    // Add logo if you have one
+    // $pdf->Image('../path/to/logo.png', 15, 15, 50);
+
+    // Title
+    $pdf->SetFont('helvetica', 'B', 20);
+    $pdf->Cell(0, 10, 'Project Completion Summary', 0, 1, 'C');
+    $pdf->Ln(10);
+
+    // Project Details
+    $pdf->SetFont('helvetica', 'B', 14);
+    $pdf->Cell(0, 10, 'Project Details', 0, 1, 'L');
+    $pdf->SetFont('helvetica', '', 12);
+    $pdf->Cell(0, 10, 'Project: ' . $projectInfo['project_name'], 0, 1, 'L');
+    $pdf->Cell(0, 10, 'Client: ' . $projectInfo['client_name'], 0, 1, 'L');
+    $pdf->Ln(5);
+
+    // Get project dates
+    $dateStmt = $pdo->prepare("SELECT start_date, end_date, completed_at FROM projects WHERE project_id = ?");
+    $dateStmt->execute([$projectId]);
+    $dates = $dateStmt->fetch(PDO::FETCH_ASSOC);
+    
+    $pdf->Cell(0, 10, 'Start Date: ' . date('F d, Y', strtotime($dates['start_date'])), 0, 1, 'L');
+    $pdf->Cell(0, 10, 'End Date: ' . date('F d, Y', strtotime($dates['end_date'])), 0, 1, 'L');
+    $pdf->Cell(0, 10, 'Completion Date: ' . date('F d, Y', strtotime($dates['completed_at'])), 0, 1, 'L');
+    $pdf->Ln(10);
+
+    // Task Categories and Progress
+    $pdf->SetFont('helvetica', 'B', 14);
+    $pdf->Cell(0, 10, 'Project Timeline and Tasks', 0, 1, 'L');
+    $pdf->SetFont('helvetica', '', 12);
+
+    $categoryStmt = $pdo->prepare("
+        SELECT 
+            tc.category_name,
+            tc.description,
+            COUNT(t.task_id) as total_tasks,
+            SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks
+        FROM task_categories tc
+        LEFT JOIN tasks t ON tc.category_id = t.category_id
+        WHERE tc.project_id = ?
+        GROUP BY tc.category_id
+        ORDER BY tc.category_id ASC
+    ");
+    $categoryStmt->execute([$projectId]);
+    
+    while ($category = $categoryStmt->fetch(PDO::FETCH_ASSOC)) {
+        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->Cell(0, 10, $category['category_name'], 0, 1, 'L');
+        $pdf->SetFont('helvetica', '', 12);
+        $pdf->MultiCell(0, 10, $category['description'], 0, 'L');
+        $pdf->Cell(0, 10, "Completed Tasks: {$category['completed_tasks']}/{$category['total_tasks']}", 0, 1, 'L');
+        $pdf->Ln(5);
+    }
+
+    // Project Files Section
+    $pdf->AddPage();
+    $pdf->SetFont('helvetica', 'B', 14);
+    $pdf->Cell(0, 10, 'Project Documentation', 0, 1, 'L');
+    $pdf->SetFont('helvetica', '', 12);
+
+    // Get file information
+    $fileStmt = $pdo->prepare("
+        SELECT quotation_file, contract_file, budget_file 
+        FROM projects 
+        WHERE project_id = ?
+    ");
+    $fileStmt->execute([$projectId]);
+    $files = $fileStmt->fetch(PDO::FETCH_ASSOC);
+
+    $pdf->Cell(0, 10, 'The following documents are attached to this project:', 0, 1, 'L');
+    $pdf->Ln(5);
+
+    if ($files['quotation_file']) {
+        $pdf->Cell(0, 10, '• Quotation File: ' . $files['quotation_file'], 0, 1, 'L');
+    }
+    if ($files['contract_file']) {
+        $pdf->Cell(0, 10, '• Contract File: ' . $files['contract_file'], 0, 1, 'L');
+    }
+    if ($files['budget_file']) {
+        $pdf->Cell(0, 10, '• Budget/Costing File: ' . $files['budget_file'], 0, 1, 'L');
+    }
+
+    // Save PDF to temporary file
+    $tempFile = tempnam(sys_get_temp_dir(), 'project_summary_');
+    $pdf->Output($tempFile, 'F');
+    
+    return $tempFile;
+}
+
+function sendCompletionEmail($to, $clientName, $projectName, $pdfPath, $projectFiles) {
     try {
         $mail = new PHPMailer(true);
         
         // Server settings
-        $mail->SMTPDebug  = 0;  // Disable debug output
+        $mail->SMTPDebug  = 0;
         $mail->isSMTP();
         $mail->Host       = SMTP_HOST;
         $mail->SMTPAuth   = true;
@@ -41,22 +153,44 @@ function sendCompletionEmail($to, $clientName, $projectName) {
         $mail->setFrom(SMTP_FROM, SMTP_FROM_NAME);
         $mail->addAddress($to, $clientName);
         
+        // Attach the project summary PDF
+        $mail->addAttachment($pdfPath, 'Project_Summary.pdf');
+
+        // Attach project files if they exist
+        if ($projectFiles['quotation_file']) {
+            $mail->addAttachment('../uploads/quotations/' . $projectFiles['quotation_file']);
+        }
+        if ($projectFiles['contract_file']) {
+            $mail->addAttachment('../uploads/contracts/' . $projectFiles['contract_file']);
+        }
+        if ($projectFiles['budget_file']) {
+            $mail->addAttachment('../uploads/budgets/' . $projectFiles['budget_file']);
+        }
+
         // Content
         $mail->isHTML(true);
-        $mail->Subject = "Project Completion Notification";
+        $mail->Subject = "Project Completion Summary - " . $projectName;
         
         // HTML email body
         $mail->Body = "
         <html>
         <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
             <div style='max-width: 600px; margin: 0 auto; padding: 20px;'>
-                <h2 style='color: #235347;'>Project Completion Notice</h2>
+                <h2 style='color: #235347;'>Project Completion Summary</h2>
                 
                 <p>Dear {$clientName},</p>
                 
                 <p>We are pleased to inform you that your project '<strong>{$projectName}</strong>' has been successfully completed.</p>
                 
-                <p>You can log in to your client dashboard to view the complete project details and documentation.</p>
+                <p>Attached to this email you will find:</p>
+                <ul>
+                    <li>Project Completion Summary (PDF)</li>
+                    " . ($projectFiles['quotation_file'] ? "<li>Project Quotation</li>" : "") . "
+                    " . ($projectFiles['contract_file'] ? "<li>Project Contract</li>" : "") . "
+                    " . ($projectFiles['budget_file'] ? "<li>Project Budget/Costing</li>" : "") . "
+                </ul>
+                
+                <p>You can also log in to your client dashboard to view all project details and documentation.</p>
                 
                 <p>Thank you for choosing our services.</p>
                 
@@ -69,28 +203,15 @@ function sendCompletionEmail($to, $clientName, $projectName) {
         </body>
         </html>";
 
-        // Plain text version
-        $mail->AltBody = "
-Dear {$clientName},
-
-We are pleased to inform you that your project '{$projectName}' has been successfully completed.
-
-You can log in to your client dashboard to view the complete project details and documentation.
-
-Thank you for choosing our services.
-
-Best regards,
-Project Management Team";
-        
-        // Log email attempt
-        error_log("Attempting to send completion email to: $to");
-        
         $mail->send();
-        error_log("Completion email sent successfully to: $to");
+        unlink($pdfPath); // Delete temporary PDF file
         return true;
         
     } catch (Exception $e) {
         error_log("Error sending completion email: " . $e->getMessage());
+        if (file_exists($pdfPath)) {
+            unlink($pdfPath); // Clean up temp file even if email fails
+        }
         return false;
     }
 }
@@ -147,11 +268,25 @@ try {
     ");
     
     if ($stmt->execute([$projectId])) {
-        // Send email notification
+        // Get project files
+        $fileStmt = $pdo->prepare("
+            SELECT quotation_file, contract_file, budget_file 
+            FROM projects 
+            WHERE project_id = ?
+        ");
+        $fileStmt->execute([$projectId]);
+        $projectFiles = $fileStmt->fetch(PDO::FETCH_ASSOC);
+
+        // Generate PDF
+        $pdfPath = generateProjectSummaryPDF($pdo, $projectId, $projectInfo);
+
+        // Send email with PDF and files
         $emailSent = sendCompletionEmail(
             $projectInfo['client_email'],
             $projectInfo['client_name'],
-            $projectInfo['project_name']
+            $projectInfo['project_name'],
+            $pdfPath,
+            $projectFiles
         );
 
         // Insert notification in database
@@ -182,6 +317,26 @@ try {
             $projectId,
             $notificationMessage
         ]);
+
+        // Get assigned personnel
+        $stmt = $pdo->prepare("
+            SELECT user_id 
+            FROM project_assignees 
+            WHERE project_id = ?
+        ");
+        $stmt->execute([$projectId]);
+        $assignees = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        // Update active_projects count for each assignee
+        $update_stmt = $pdo->prepare("
+            UPDATE users 
+            SET active_projects = active_projects - 1 
+            WHERE user_id = ? AND active_projects > 0
+        ");
+
+        foreach ($assignees as $user_id) {
+            $update_stmt->execute([$user_id]);
+        }
 
         $pdo->commit();
         

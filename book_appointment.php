@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once 'dbconnect.php';  // Changed from 'config/database.php' to 'dbconnect.php'
 
 // Redirect if not logged in
 if (!isset($_SESSION['logged_in'])) {
@@ -13,43 +14,123 @@ if ($_SESSION['role'] !== 'client') {
     exit();
 }
 
+// Check for pending appointments count
+$pending_count_query = "
+    SELECT COUNT(*) as pending_count 
+    FROM appointments 
+    WHERE client_id = ? 
+    AND status = 'pending'
+";
+$stmt = $pdo->prepare($pending_count_query);
+$stmt->execute([$_SESSION['user_id']]);
+$pending_count = $stmt->fetch(PDO::FETCH_ASSOC)['pending_count'];
+
+if ($pending_count >= 3) {
+    $_SESSION['error_message'] = "You have reached the maximum number of pending appointments (3). Please wait for your current appointments to be confirmed or cancelled before booking new ones.";
+    header('Location: client/dashboard.php');
+    exit;
+}
+
 // Services Data Structure
 $services = [
     'Civil / Architectural' => [
-        'Interior Finishes and Furnishing',
-        'Fabrication of Furniture, Cabinets and Shelves',
-        'Supply and install of open plan office partitions',
-        'Wall Partitions, Ceilings, Floorings, Doors and Windows',
-        'Preventive maintenance and other related Civil / Architectural Works'
+        'Interior Finishes and Furnishing' => [
+            'description' => 'We help design and furnish your space with modern furniture and decorative elements.',
+            'icon' => 'fa-couch'
+        ],
+        'Fabrication of Furniture, Cabinets and Shelves' => [
+            'description' => 'We build custom furniture, cabinets, and storage solutions that fit your space perfectly.',
+            'icon' => 'fa-hammer'
+        ],
+        'Supply and install of open plan office partitions' => [
+            'description' => 'We set up modern office spaces with flexible dividers to create an efficient workspace.',
+            'icon' => 'fa-table-cells-large'
+        ],
+        'Wall Partitions, Ceilings, Floorings, Doors and Windows' => [
+            'description' => 'We handle all interior work including walls, ceilings, floors, doors, and windows.',
+            'icon' => 'fa-door-open'
+        ],
+        'Preventive maintenance and other related Civil / Architectural Works' => [
+            'description' => 'We provide regular checkups and maintenance to keep your building in top shape.',
+            'icon' => 'fa-screwdriver-wrench'
+        ]
     ],
     'Electrical' => [
-        'Installation of Electrical Facilities',
-        'Structured Cabling Systems',
-        'Power Distribution & Monitoring',
-        'Site Monitoring System',
-        'Security CCTV & Access Control System',
-        'Fire alarm and Detection System',
-        'Power Conditioners & Controls',
-        'Preventive Maintenance and other related Electrical Works'
+        'Installation of Electrical Facilities' => [
+            'description' => 'We install all electrical systems safely and efficiently.',
+            'icon' => 'fa-plug'
+        ],
+        'Structured Cabling Systems' => [
+            'description' => 'We set up reliable network cables for internet, phones, and other communications.',
+            'icon' => 'fa-network-wired'
+        ],
+        'Power Distribution & Monitoring' => [
+            'description' => 'We help manage and track your power usage for better efficiency.',
+            'icon' => 'fa-bolt'
+        ],
+        'Site Monitoring System' => [
+            'description' => 'We install systems to help you monitor and secure your property.',
+            'icon' => 'fa-tv'
+        ],
+        'Security CCTV & Access Control System' => [
+            'description' => 'We set up security cameras and door access systems to keep your property safe.',
+            'icon' => 'fa-camera'
+        ],
+        'Fire alarm and Detection System' => [
+            'description' => 'We install fire alarms that quickly detect and warn about fire hazards.',
+            'icon' => 'fa-fire'
+        ],
+        'Power Conditioners & Controls' => [
+            'description' => 'We install equipment that keeps your power supply stable and protects your devices.',
+            'icon' => 'fa-charging-station'
+        ],
+        'Preventive Maintenance and other related Electrical Works' => [
+            'description' => 'We provide regular checkups to keep your electrical systems safe and working well.',
+            'icon' => 'fa-wrench'
+        ]
     ],
     'Mechanical Services and Capabilities' => [
-        'Plan Design, estimate and built complete refrigeration / air conditioning facility for: food beverage industry, breweries, cold storage/ distribution centers, dairy /ice cream plants, meat process plants, sea foods/ fish process plants and other cooling applications.',
-        'Computer Grade Precision Air Conditioning',
-        'Process Chillers',
-        'HVAC Application',
-        'Fire Suppression System',
-        'Fire Sprinkler Systems',
-        'Generators',
-        'Preventive Maintenance and other mechanical works'
+        'Complete Refrigeration / Air Conditioning Facility' => [
+            'description' => 'We install and maintain cooling systems for all types of spaces.',
+            'icon' => 'fa-temperature-low'
+        ],
+        'Computer Grade Precision Air Conditioning' => [
+            'description' => 'We provide special cooling systems for computer rooms and servers.',
+            'icon' => 'fa-server'
+        ],
+        'Process Chillers' => [
+            'description' => 'We install industrial cooling equipment for manufacturing needs.',
+            'icon' => 'fa-snowflake'
+        ],
+        'HVAC Application' => [
+            'description' => 'We handle all heating, cooling, and ventilation needs for your building.',
+            'icon' => 'fa-fan'
+        ],
+        'Fire Suppression System' => [
+            'description' => 'We install systems that quickly put out fires to protect your property.',
+            'icon' => 'fa-fire-extinguisher'
+        ],
+        'Fire Sprinkler Systems' => [
+            'description' => 'We install automatic sprinklers throughout your building for fire protection.',
+            'icon' => 'fa-spray-can'
+        ],
+        'Generators' => [
+            'description' => 'We provide backup power systems to keep you running during power outages.',
+            'icon' => 'fa-power-off'
+        ],
+        'Preventive Maintenance and other mechanical works' => [
+            'description' => 'We regularly check and maintain all mechanical equipment to prevent problems.',
+            'icon' => 'fa-tools'
+        ]
     ]
 ];
 
 // Function to get booked time slots for a specific date
 function getBookedTimeSlots($pdo, $date) {
     $stmt = $pdo->prepare("
-        SELECT TIME_FORMAT(preferred_time, '%H:%i') as booked_time 
+        SELECT TIME_FORMAT(time, '%H:%i') as booked_time 
         FROM appointments 
-        WHERE preferred_date = ? 
+        WHERE date = ? 
         AND status != 'cancelled'
     ");
     $stmt->execute([$date]);
@@ -78,6 +159,59 @@ function getBookedTimeSlots($pdo, $date) {
 
     <!-- Google reCAPTCHA -->
     <script src="https://www.google.com/recaptcha/api.js?render=6LcVU_wqAAAAANKqzxrZ-qBG1FFxOHhJd97KJSWD"></script>
+
+    <style>
+    .services-table-container {
+        max-width: 100%;
+        margin: 0 auto;
+    }
+
+    .category-section {
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+
+    .category-header {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .category-title {
+        margin: 0;
+        color: #235347;
+    }
+
+    .service-row {
+        transition: all 0.3s ease;
+    }
+
+    .service-row:hover {
+        background-color: #f8f9fa;
+    }
+
+    .service-name {
+        cursor: pointer;
+        display: block;
+        padding: 0.5rem 0;
+    }
+
+    .service-description {
+        font-size: 0.9rem;
+        padding-left: 1.8rem;
+    }
+
+    .form-check-input:checked + label {
+        color: #235347;
+    }
+
+    .service-checkbox {
+        transform: scale(1.2);
+    }
+    </style>
 </head>
 <body id="appointmentPage">
     
@@ -177,21 +311,25 @@ function getBookedTimeSlots($pdo, $date) {
                                             <div class="table-responsive">
                                                 <table class="table table-hover services-table">
                                                     <tbody>
-                                                        <?php foreach ($categoryServices as $index => $service): ?>
+                                                        <?php foreach ($categoryServices as $serviceName => $serviceData): ?>
                                                             <tr class="service-row">
                                                                 <td style="width: 50px;">
                                                                     <div class="form-check">
                                                                         <input class="form-check-input service-checkbox" 
                                                                                type="checkbox"
                                                                                name="service[]" 
-                                                                               value="<?php echo htmlspecialchars($category . ': ' . $service); ?>"
-                                                                               id="service-<?php echo $category . '-' . $index; ?>"
-                                                                               data-service-name="<?php echo htmlspecialchars($service); ?>">
+                                                                               value="<?php echo htmlspecialchars($category . ': ' . $serviceName); ?>"
+                                                                               id="service-<?php echo $category . '-' . $serviceName; ?>"
+                                                                               data-service-name="<?php echo htmlspecialchars($serviceName); ?>">
                                                                     </div>
                                                                 </td>
                                                                 <td>
-                                                                    <label class="service-name" for="service-<?php echo $category . '-' . $index; ?>">
-                                                                        <?php echo htmlspecialchars($service); ?>
+                                                                    <label class="service-name" for="service-<?php echo $category . '-' . $serviceName; ?>">
+                                                                        <i class="fas <?php echo $serviceData['icon']; ?> me-2 text-primary"></i>
+                                                                        <strong><?php echo htmlspecialchars($serviceName); ?></strong>
+                                                                        <p class="text-muted mb-0 mt-1 service-description">
+                                                                            <?php echo htmlspecialchars($serviceData['description']); ?>
+                                                                        </p>
                                                                     </label>
                                                                 </td>
                                                             </tr>
@@ -213,6 +351,33 @@ function getBookedTimeSlots($pdo, $date) {
                                             </ul>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- Add this right before the Date and Time Selection section -->
+                            <div class="mb-4">
+                                <label class="form-label">Appointment Type</label>
+                                <div class="d-flex gap-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="appointment_type" id="face-to-face" value="face-to-face" required>
+                                        <label class="form-check-label" for="face-to-face">
+                                            <i class="fas fa-user-group me-2"></i>Face-to-Face
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="appointment_type" id="online" value="online" required>
+                                        <label class="form-check-label" for="online">
+                                            <i class="fas fa-video me-2"></i>Online Meeting
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Add this div that will show only when online is selected -->
+                            <div id="online-meeting-info" class="mb-4" style="display: none;">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Note:</strong> Meeting link will be sent to your email after confirmation.
                                 </div>
                             </div>
 
@@ -365,7 +530,6 @@ function getBookedTimeSlots($pdo, $date) {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            // Add loading indicator
             const submitButton = form.querySelector('button[type="submit"]');
             const originalText = submitButton.innerHTML;
             submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
@@ -373,17 +537,30 @@ function getBookedTimeSlots($pdo, $date) {
             
             grecaptcha.ready(function() {
                 grecaptcha.execute('6LcVU_wqAAAAANKqzxrZ-qBG1FFxOHhJd97KJSWD', {action: 'submit'})
-                .then(function(token) {
-                    document.getElementById('recaptcha_token').value = token;
-                    console.log('reCAPTCHA token generated:', token.substring(0, 20) + '...');
-                    form.submit();
-                })
-                .catch(function(error) {
-                    console.error('reCAPTCHA error:', error);
-                    submitButton.innerHTML = originalText;
-                    submitButton.disabled = false;
-                    alert('Error verifying reCAPTCHA. Please try again.');
-                });
+                    .then(function(token) {
+                        document.getElementById('recaptcha_token').value = token;
+                        form.submit();
+                    })
+                    .catch(function(error) {
+                        console.error('reCAPTCHA error:', error);
+                        submitButton.innerHTML = originalText;
+                        submitButton.disabled = false;
+                        alert('Error verifying reCAPTCHA. Please try again.');
+                    });
+            });
+        });
+    });
+    </script>
+
+    <!-- Add this before the closing </body> tag -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const appointmentTypeInputs = document.querySelectorAll('input[name="appointment_type"]');
+        const onlineMeetingInfo = document.getElementById('online-meeting-info');
+
+        appointmentTypeInputs.forEach(input => {
+            input.addEventListener('change', function() {
+                onlineMeetingInfo.style.display = this.value === 'online' ? 'block' : 'none';
             });
         });
     });

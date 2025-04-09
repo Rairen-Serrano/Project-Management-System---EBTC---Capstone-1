@@ -545,7 +545,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                     ELSE 0
                                                 END as max_projects
                                             FROM users u
-                                            WHERE u.role NOT IN ('client', 'admin', 'project_manager')
+                                            WHERE u.role NOT IN ('client', 'admin', 'project_manager', 'ceo')
                                             ORDER BY u.name ASC
                                         ");
                                         $stmt->execute();
@@ -553,9 +553,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                                         foreach ($personnel as $person): 
                                             $available = $person['active_projects'] < $person['max_projects'];
-                                            $availableText = $available ? 
-                                                "Available ({$person['active_projects']}/{$person['max_projects']} projects)" : 
-                                                "Not available ({$person['active_projects']}/{$person['max_projects']} projects)";
+                                            $availableText = $available ? "Available" : "Not Available";
                                         ?>
                                             <tr class="<?php echo $available ? '' : 'text-muted bg-light'; ?>">
                                                 <td>
@@ -818,8 +816,8 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             }
 
             // Get start and end dates
-            const startDate = document.getElementById('projectStartDate').value;
-            const endDate = document.getElementById('projectEndDate').value;
+            const startDate = new Date(document.getElementById('projectStartDate').value);
+            const endDate = new Date(document.getElementById('projectEndDate').value);
 
             // Validate dates
             if (!startDate || !endDate) {
@@ -827,12 +825,51 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 return;
             }
 
-            if (new Date(startDate) > new Date(endDate)) {
+            if (startDate > endDate) {
                 alert('End date cannot be earlier than start date.');
                 return;
             }
 
-            // Get project notes and quotation file
+            // Calculate the duration in days
+            const durationInDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+
+            // Determine task categories based on project duration
+            let taskCategories;
+            if (durationInDays <= 2) {
+                // Short-term project
+                taskCategories = [
+                    {
+                        name: 'Resource Preparation',
+                        description: 'Preparation of resources and materials for the project.'
+                    },
+                    {
+                        name: 'Execution and Wrap-up',
+                        description: 'Execution of the project tasks and final wrap-up.'
+                    }
+                ];
+            } else {
+                // Regular project
+                taskCategories = [
+                    {
+                        name: 'Project Planning and Design',
+                        description: 'Initial phase focusing on project scope definition, timeline planning, and technical design specifications.'
+                    },
+                    {
+                        name: 'Materials Selection and Procurement',
+                        description: 'Selection and acquisition of necessary materials, equipment, and resources for the project.'
+                    },
+                    {
+                        name: 'Project Execution',
+                        description: 'Implementation phase where the main project work is carried out according to specifications.'
+                    },
+                    {
+                        name: 'Maintenance and Optimization',
+                        description: 'Final phase ensuring project sustainability, performance optimization, and maintenance planning.'
+                    }
+                ];
+            }
+
+            // Get project notes and files
             const notes = document.getElementById('projectNotes').value;
             const quotationFile = document.getElementById('quotationFile').files[0];
             const contractFile = document.getElementById('contractFile').files[0];
@@ -847,8 +884,8 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             const formData = new FormData();
             formData.append('appointment_id', currentAppointment.id);
             formData.append('personnel', JSON.stringify(selectedPersonnel));
-            formData.append('start_date', startDate);
-            formData.append('end_date', endDate);
+            formData.append('start_date', startDate.toISOString().split('T')[0]);
+            formData.append('end_date', endDate.toISOString().split('T')[0]);
             formData.append('notes', notes);
 
             // Add the new files
@@ -883,7 +920,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 throw new Error(projectData.message || 'Project creation failed');
             }
 
-            // Create default task categories
+            // Create task categories
             await fetch('./api/create_task_categories.php', {
                 method: 'POST',
                 headers: {
@@ -891,24 +928,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 },
                 body: JSON.stringify({
                     project_id: projectData.project_id,
-                    categories: [
-                        {
-                            name: 'Project Planning and Design',
-                            description: 'Initial phase focusing on project scope definition, timeline planning, and technical design specifications.'
-                        },
-                        {
-                            name: 'Materials Selection and Procurement',
-                            description: 'Selection and acquisition of necessary materials, equipment, and resources for the project.'
-                        },
-                        {
-                            name: 'Project Execution',
-                            description: 'Implementation phase where the main project work is carried out according to specifications.'
-                        },
-                        {
-                            name: 'Maintenance and Optimization',
-                            description: 'Final phase ensuring project sustainability, performance optimization, and maintenance planning.'
-                        }
-                    ]
+                    categories: taskCategories
                 })
             });
 

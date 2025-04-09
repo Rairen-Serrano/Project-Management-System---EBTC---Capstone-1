@@ -44,18 +44,58 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-hover">
+                        <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
-                                    <th>Employee</th>
-                                    <th>Current Projects</th>
-                                    <th>Status</th>
+                                    <th style="width: 30%">Employee</th>
+                                    <th style="width: 40%">Current Projects</th>
+                                    <th style="width: 15%">Status</th>
+                                    <th style="width: 15%">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="employeeStatusTable">
                                 <!-- Employee data will be loaded here -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employee Details Modal -->
+    <div class="modal fade" id="employeeDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-user me-2"></i>
+                        <span id="modalEmployeeName"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-2">Employee Information</h6>
+                            <p class="mb-1">Role: <span id="modalEmployeeRole"></span></p>
+                            <p class="mb-1">Status: <span id="modalEmployeeStatus"></span></p>
+                            <p class="mb-0">Email: <span id="modalEmployeeEmail"></span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-2">Project Statistics</h6>
+                            <p class="mb-1">Total Projects: <span id="modalTotalProjects"></span></p>
+                            <p class="mb-1">Active Projects: <span id="modalActiveProjects"></span></p>
+                            <p class="mb-0">Completed Projects: <span id="modalCompletedProjects"></span></p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-2">Current Projects</h6>
+                            <div id="modalProjectList" class="list-group">
+                                <!-- Projects will be loaded here -->
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -113,12 +153,12 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
                 '<small class="text-muted">No active projects</small>';
 
             return `
-                <tr data-role="${employee.role}">
+                <tr data-role="${employee.role}" data-employee='${JSON.stringify(employee)}'>
                     <td>
                         <div class="d-flex align-items-center">
                             <div>
                                 <h6 class="mb-0">${employee.name}</h6>
-                                <span class="badge bg-${getRoleBadgeColor(employee.role)}">${employee.role}</span>
+                                <span class="badge role-badge">${employee.role}</span>
                             </div>
                         </div>
                     </td>
@@ -132,19 +172,63 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
                             ${employee.user_status}
                         </span>
                     </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewEmployeeDetails(this)">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
                 </tr>
             `;
         }).join('');
     }
 
-    function getRoleBadgeColor(role) {
-        const colors = {
-            'project_manager': 'primary',
-            'engineer': 'success',
-            'technician': 'info',
-            'worker': 'warning'
-        };
-        return colors[role] || 'secondary';
+    function viewEmployeeDetails(button) {
+        const row = button.closest('tr');
+        const employee = JSON.parse(row.dataset.employee);
+        const modal = new bootstrap.Modal(document.getElementById('employeeDetailsModal'));
+
+        // Update modal content
+        document.getElementById('modalEmployeeName').textContent = employee.name;
+        document.getElementById('modalEmployeeRole').innerHTML = `
+            <span class="badge role-badge">${employee.role}</span>
+        `;
+        document.getElementById('modalEmployeeStatus').innerHTML = `
+            <span class="badge bg-${employee.user_status === 'active' ? 'success' : 'secondary'}">
+                ${employee.user_status}
+            </span>
+        `;
+        document.getElementById('modalEmployeeEmail').textContent = employee.email || 'N/A';
+        
+        // Update project statistics
+        const projectList = document.getElementById('modalProjectList');
+        if (employee.project_details) {
+            const projects = employee.project_details.split('|');
+            document.getElementById('modalTotalProjects').textContent = projects.length;
+            document.getElementById('modalActiveProjects').textContent = 
+                projects.filter(p => p.includes('ongoing')).length;
+            document.getElementById('modalCompletedProjects').textContent = 
+                projects.filter(p => p.includes('completed')).length;
+
+            projectList.innerHTML = projects.map(project => {
+                const [name, status] = project.split(' (');
+                const statusClass = status.includes('ongoing') ? 'warning' : 'success';
+                return `
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">${name}</h6>
+                            <span class="badge bg-${statusClass}">${status.replace(')', '')}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            projectList.innerHTML = '<p class="text-muted mb-0">No projects assigned</p>';
+            document.getElementById('modalTotalProjects').textContent = '0';
+            document.getElementById('modalActiveProjects').textContent = '0';
+            document.getElementById('modalCompletedProjects').textContent = '0';
+        }
+
+        modal.show();
     }
 
     function showError(message) {
@@ -154,5 +238,43 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
         document.querySelector('.card-body').prepend(errorDiv);
     }
     </script>
+
+    <style>
+    .text-truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .badge {
+        font-size: 0.85rem;
+    }
+
+    .role-badge {
+        background-color: transparent;
+        border: none;
+        color: #6c757d;
+        font-weight: normal;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .modal-body .badge {
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+    }
+
+    .list-group-item {
+        border-left: none;
+        border-right: none;
+    }
+
+    .list-group-item:first-child {
+        border-top: none;
+    }
+
+    .list-group-item:last-child {
+        border-bottom: none;
+    }
+    </style>
 </body>
 </html>

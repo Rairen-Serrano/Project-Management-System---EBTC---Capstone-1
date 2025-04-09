@@ -47,18 +47,65 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
                         <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
-                                    <th>Project</th>
-                                    <th>Client</th>
-                                    <th>Team Members</th>
-                                    <th>Progress</th>
-                                    <th>Deadline</th>
-                                    <th>Status</th>
+                                    <th style="width: 25%">Project</th>
+                                    <th style="width: 15%">Client</th>
+                                    <th style="width: 25%">Team Members</th>
+                                    <th style="width: 15%">Progress</th>
+                                    <th style="width: 10%">Deadline</th>
+                                    <th style="width: 10%">Status</th>
+                                    <th style="width: 10%">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="projectOverviewTable">
                                 <!-- Project data will be loaded here -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Details Modal -->
+    <div class="modal fade" id="projectDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-project-diagram me-2"></i>
+                        <span id="modalProjectName"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-2">Client Information</h6>
+                            <p class="mb-1" id="modalClientName"></p>
+                            <p class="mb-0" id="modalClientContact"></p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-2">Project Status</h6>
+                            <p class="mb-1">Status: <span id="modalProjectStatus"></span></p>
+                            <p class="mb-0">Deadline: <span id="modalProjectDeadline"></span></p>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-2">Team Members</h6>
+                            <div id="modalTeamMembers" class="d-flex flex-wrap gap-2">
+                                <!-- Team members will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-2">Progress</h6>
+                            <div class="progress mb-2" style="height: 20px;">
+                                <div id="modalProgressBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <p class="text-center mb-0" id="modalProgressText"></p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -109,17 +156,29 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
             const teamMembers = project.team_members ? 
                 project.team_members.split('|').map(member => {
                     const [name, role] = member.split(':');
-                    return `<span class="badge bg-${getRoleBadgeColor(role)}" title="${role}">${name}</span>`;
+                    return `<span class="badge role-badge" title="${role}">${name}</span>`;
                 }).join(' ') : 'No team assigned';
 
             const endDate = new Date(project.end_date);
             const isOverdue = endDate < new Date() && project.status !== 'completed';
 
             return `
-                <tr data-status="${project.status}">
-                    <td><strong>${project.service}</strong></td>
-                    <td>${project.client_name}</td>
-                    <td>${teamMembers}</td>
+                <tr data-status="${project.status}" data-project='${JSON.stringify(project)}'>
+                    <td>
+                        <div class="text-truncate" style="max-width: 200px;" title="${project.service}">
+                            ${project.service}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="text-truncate" style="max-width: 150px;" title="${project.client_name}">
+                            ${project.client_name}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="text-truncate" style="max-width: 200px;" title="${teamMembers}">
+                            ${teamMembers}
+                        </div>
+                    </td>
                     <td>
                         <div class="progress" style="height: 8px;">
                             <div class="progress-bar ${project.progress >= 100 ? 'bg-success' : ''}" 
@@ -133,7 +192,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
                         <small class="text-muted">${Math.round(project.progress)}%</small>
                     </td>
                     <td>
-                        <span class="text-${isOverdue ? 'danger' : 'muted'}">
+                        <span class="text-${isOverdue ? 'danger' : 'muted'}" title="${endDate.toLocaleDateString()}">
                             ${endDate.toLocaleDateString()}
                         </span>
                     </td>
@@ -142,19 +201,52 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
                             ${project.status}
                         </span>
                     </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewProjectDetails(this)">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
                 </tr>
             `;
         }).join('');
     }
 
-    function getRoleBadgeColor(role) {
-        const colors = {
-            'project_manager': 'primary',
-            'engineer': 'success',
-            'technician': 'info',
-            'worker': 'warning'
-        };
-        return colors[role] || 'secondary';
+    function viewProjectDetails(button) {
+        const row = button.closest('tr');
+        const project = JSON.parse(row.dataset.project);
+        const modal = new bootstrap.Modal(document.getElementById('projectDetailsModal'));
+
+        // Update modal content
+        document.getElementById('modalProjectName').textContent = project.service;
+        document.getElementById('modalClientName').textContent = project.client_name;
+        document.getElementById('modalProjectStatus').innerHTML = `
+            <span class="badge bg-${project.status === 'ongoing' ? 'warning' : 'success'}">
+                ${project.status}
+            </span>
+        `;
+        document.getElementById('modalProjectDeadline').textContent = new Date(project.end_date).toLocaleDateString();
+        
+        // Update team members
+        const teamMembersContainer = document.getElementById('modalTeamMembers');
+        teamMembersContainer.innerHTML = project.team_members ? 
+            project.team_members.split('|').map(member => {
+                const [name, role] = member.split(':');
+                return `
+                    <div class="badge role-badge p-2">
+                        ${name}
+                        <small class="d-block">${role}</small>
+                    </div>
+                `;
+            }).join('') : 
+            '<p class="text-muted mb-0">No team assigned</p>';
+
+        // Update progress
+        const progressBar = document.getElementById('modalProgressBar');
+        progressBar.style.width = `${project.progress}%`;
+        progressBar.className = `progress-bar ${project.progress >= 100 ? 'bg-success' : ''}`;
+        document.getElementById('modalProgressText').textContent = `${Math.round(project.progress)}% Complete`;
+
+        modal.show();
     }
 
     function showError(message) {
@@ -164,5 +256,34 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
         document.querySelector('.card-body').prepend(errorDiv);
     }
     </script>
+
+    <style>
+    .text-truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .badge {
+        font-size: 0.85rem;
+    }
+
+    .role-badge {
+        background-color: transparent;
+        border: none;
+        color: #000000;
+        font-weight: normal;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .modal-body .badge {
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+    }
+
+    .progress {
+        background-color: #e9ecef;
+    }
+    </style>
 </body>
 </html>

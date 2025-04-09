@@ -60,6 +60,28 @@ if (!$project) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../js/script.js"></script>
 
+    <style>
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .task-header .project-info {
+            flex: 1;
+            min-width: 200px;
+            margin-right: 1rem;
+        }
+
+        .task-header .buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+    </style>
+
 </head>
 <body>
     <div class="manager-dashboard-wrapper">
@@ -67,16 +89,16 @@ if (!$project) {
         
         <div class="manager-main-content">
             <!-- Page Header -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
+            <div class="task-header">
+                <div class="project-info">
                     <h3 class="mb-1">Task Management</h3>
                     <p class="text-muted mb-0">
-                        Project: <?php echo htmlspecialchars($project['service']); ?>
+                        Project: <span title="<?php echo htmlspecialchars($project['service']); ?>"><?php echo htmlspecialchars($project['service']); ?></span>
                         <br>
                         Client: <?php echo htmlspecialchars($project['client_name']); ?>
                     </p>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="buttons">
                     <button class="btn btn-info" onclick="showArchivedTasks()">
                         <i class="fas fa-archive me-2"></i>Archived Tasks
                     </button>

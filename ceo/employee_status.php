@@ -36,10 +36,13 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
                     <h5 class="card-title mb-0">
                         <i class="fas fa-users me-2"></i>Employee Status
                     </h5>
-                    <div class="btn-group">
-                        <button type="button" class="btn btn-outline-primary active" data-role="all">All</button>
-                        <button type="button" class="btn btn-outline-info" data-role="project_manager">PM</button>
-                        <button type="button" class="btn btn-outline-success" data-role="engineer">Engineers</button>
+                    <div class="search-container">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white">
+                                <i class="fas fa-search text-muted"></i>
+                            </span>
+                            <input type="text" id="employeeSearch" class="form-control" placeholder="Search employees...">
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
@@ -48,9 +51,8 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
                             <thead>
                                 <tr>
                                     <th style="width: 30%">Employee</th>
-                                    <th style="width: 40%">Current Projects</th>
-                                    <th style="width: 15%">Status</th>
-                                    <th style="width: 15%">Actions</th>
+                                    <th style="width: 50%">Current Projects</th>
+                                    <th style="width: 20%">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="employeeStatusTable">
@@ -67,7 +69,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
     <div class="modal fade" id="employeeDetailsModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header">
+                <div class="modal-header bg-light">
                     <h5 class="modal-title">
                         <i class="fas fa-user me-2"></i>
                         <span id="modalEmployeeName"></span>
@@ -75,28 +77,91 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <h6 class="text-muted mb-2">Employee Information</h6>
-                            <p class="mb-1">Role: <span id="modalEmployeeRole"></span></p>
-                            <p class="mb-1">Status: <span id="modalEmployeeStatus"></span></p>
-                            <p class="mb-0">Email: <span id="modalEmployeeEmail"></span></p>
+                    <div class="row mb-4">
+                        <div class="col-md-4 text-center">
+                            <div class="employee-avatar mb-3">
+                                <i class="fas fa-user-circle fa-4x text-primary"></i>
+                            </div>
+                            <h5 id="modalEmployeeNameAvatar" class="mb-1"></h5>
+                            <p class="text-muted mb-0" id="modalEmployeeRoleBadge"></p>
                         </div>
-                        <div class="col-md-6">
-                            <h6 class="text-muted mb-2">Project Statistics</h6>
-                            <p class="mb-1">Total Projects: <span id="modalTotalProjects"></span></p>
-                            <p class="mb-1">Active Projects: <span id="modalActiveProjects"></span></p>
-                            <p class="mb-0">Completed Projects: <span id="modalCompletedProjects"></span></p>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-12">
-                            <h6 class="text-muted mb-2">Current Projects</h6>
-                            <div id="modalProjectList" class="list-group">
-                                <!-- Projects will be loaded here -->
+                        <div class="col-md-8">
+                            <div class="card h-100">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">Contact Information</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p class="mb-2">
+                                                <i class="fas fa-envelope text-primary me-2"></i>
+                                                <strong>Email:</strong><br>
+                                                <span id="modalEmployeeEmail"></span>
+                                            </p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <p class="mb-2">
+                                                <i class="fas fa-phone text-primary me-2"></i>
+                                                <strong>Phone:</strong><br>
+                                                <span id="modalEmployeePhone">N/A</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">Project Statistics</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-md-4">
+                                            <div class="stat-card bg-primary bg-opacity-10 p-3 rounded">
+                                                <h3 id="modalTotalProjects" class="text-primary mb-0">0</h3>
+                                                <p class="text-muted mb-0">Total Projects</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="stat-card bg-warning bg-opacity-10 p-3 rounded">
+                                                <h3 id="modalActiveProjects" class="text-warning mb-0">0</h3>
+                                                <p class="text-muted mb-0">Active Projects</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="stat-card bg-success bg-opacity-10 p-3 rounded">
+                                                <h3 id="modalCompletedProjects" class="text-success mb-0">0</h3>
+                                                <p class="text-muted mb-0">Completed Projects</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">Current Projects</h6>
+                                    <span class="badge bg-primary" id="modalProjectCount">0 Projects</span>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div id="modalProjectList" class="list-group list-group-flush">
+                                        <!-- Projects will be loaded here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -106,20 +171,23 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
     document.addEventListener('DOMContentLoaded', function() {
         loadEmployeeData();
 
-        // Role filter buttons
-        document.querySelectorAll('[data-role]').forEach(button => {
-            button.addEventListener('click', function() {
-                document.querySelectorAll('[data-role]').forEach(btn => btn.classList.remove('active'));
-                this.classList.add('active');
-                const role = this.dataset.role;
+        // Search functionality
+        const searchInput = document.getElementById('employeeSearch');
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            
+            document.querySelectorAll('#employeeStatusTable tr').forEach(row => {
+                const employeeName = row.querySelector('h6')?.textContent.toLowerCase() || '';
+                const employeeRole = row.querySelector('.role-badge')?.textContent.toLowerCase() || '';
+                const projects = row.querySelector('.projects-container')?.textContent.toLowerCase() || '';
                 
-                document.querySelectorAll('#employeeStatusTable tr').forEach(row => {
-                    if (role === 'all' || row.dataset.role === role) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
+                if (employeeName.includes(searchTerm) || 
+                    employeeRole.includes(searchTerm) || 
+                    projects.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
             });
         });
     });
@@ -146,16 +214,28 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
             const projects = employee.project_details ? 
                 employee.project_details.split('|').map(project => {
                     const [name, status] = project.split(' (');
-                    return `<div class="text-truncate">
-                        <small class="text-muted">• ${name}</small>
-                    </div>`;
+                    const statusClass = status.includes('ongoing') ? 'warning' : 'success';
+                    return `
+                        <div class="project-item mb-2">
+                            <div class="d-flex align-items-center">
+                                <div class="project-status-indicator bg-${statusClass} me-2"></div>
+                                <div class="project-info">
+                                    <div class="project-name">${name}</div>
+                                    <div class="project-status text-muted small">${status.replace(')', '')}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
                 }).join('') : 
-                '<small class="text-muted">No active projects</small>';
+                '<div class="text-muted"><i class="fas fa-info-circle me-1"></i> No active projects</div>';
 
             return `
                 <tr data-role="${employee.role}" data-employee='${JSON.stringify(employee)}'>
                     <td>
                         <div class="d-flex align-items-center">
+                            <div class="employee-avatar-small me-3">
+                                <i class="fas fa-user-circle text-primary"></i>
+                            </div>
                             <div>
                                 <h6 class="mb-0">${employee.name}</h6>
                                 <span class="badge role-badge">${employee.role}</span>
@@ -163,18 +243,13 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
                         </div>
                     </td>
                     <td>
-                        <div style="max-height: 60px; overflow-y: auto;">
+                        <div class="projects-container">
                             ${projects}
                         </div>
                     </td>
                     <td>
-                        <span class="badge bg-${employee.user_status === 'active' ? 'success' : 'secondary'}">
-                            ${employee.user_status}
-                        </span>
-                    </td>
-                    <td>
                         <button class="btn btn-sm btn-outline-primary" onclick="viewEmployeeDetails(this)">
-                            <i class="fas fa-eye"></i>
+                            <i class="fas fa-eye me-1"></i> View
                         </button>
                     </td>
                 </tr>
@@ -189,13 +264,9 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
 
         // Update modal content
         document.getElementById('modalEmployeeName').textContent = employee.name;
-        document.getElementById('modalEmployeeRole').innerHTML = `
+        document.getElementById('modalEmployeeNameAvatar').textContent = employee.name;
+        document.getElementById('modalEmployeeRoleBadge').innerHTML = `
             <span class="badge role-badge">${employee.role}</span>
-        `;
-        document.getElementById('modalEmployeeStatus').innerHTML = `
-            <span class="badge bg-${employee.user_status === 'active' ? 'success' : 'secondary'}">
-                ${employee.user_status}
-            </span>
         `;
         document.getElementById('modalEmployeeEmail').textContent = employee.email || 'N/A';
         
@@ -203,11 +274,14 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
         const projectList = document.getElementById('modalProjectList');
         if (employee.project_details) {
             const projects = employee.project_details.split('|');
-            document.getElementById('modalTotalProjects').textContent = projects.length;
-            document.getElementById('modalActiveProjects').textContent = 
-                projects.filter(p => p.includes('ongoing')).length;
-            document.getElementById('modalCompletedProjects').textContent = 
-                projects.filter(p => p.includes('completed')).length;
+            const totalProjects = projects.length;
+            const activeProjects = projects.filter(p => p.includes('ongoing')).length;
+            const completedProjects = projects.filter(p => p.includes('completed')).length;
+            
+            document.getElementById('modalTotalProjects').textContent = totalProjects;
+            document.getElementById('modalActiveProjects').textContent = activeProjects;
+            document.getElementById('modalCompletedProjects').textContent = completedProjects;
+            document.getElementById('modalProjectCount').textContent = `${totalProjects} Projects`;
 
             projectList.innerHTML = projects.map(project => {
                 const [name, status] = project.split(' (');
@@ -215,17 +289,21 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
                 return `
                     <div class="list-group-item">
                         <div class="d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0">${name}</h6>
+                            <div>
+                                <h6 class="mb-1">${name}</h6>
+                                <small class="text-muted">Project Details</small>
+                            </div>
                             <span class="badge bg-${statusClass}">${status.replace(')', '')}</span>
                         </div>
                     </div>
                 `;
             }).join('');
         } else {
-            projectList.innerHTML = '<p class="text-muted mb-0">No projects assigned</p>';
+            projectList.innerHTML = '<div class="list-group-item text-center py-4"><p class="text-muted mb-0">No projects assigned</p></div>';
             document.getElementById('modalTotalProjects').textContent = '0';
             document.getElementById('modalActiveProjects').textContent = '0';
             document.getElementById('modalCompletedProjects').textContent = '0';
+            document.getElementById('modalProjectCount').textContent = '0 Projects';
         }
 
         modal.show();
@@ -274,6 +352,113 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
 
     .list-group-item:last-child {
         border-bottom: none;
+    }
+
+    /* New styles for enhanced UI */
+    .employee-avatar {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        border-radius: 50%;
+    }
+
+    .employee-avatar-small {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        border-radius: 50%;
+    }
+
+    .projects-container {
+        max-height: 120px;
+        overflow-y: auto;
+        padding-right: 10px;
+    }
+
+    .project-item {
+        padding: 8px;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+        margin-bottom: 8px;
+    }
+
+    .project-status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+
+    .project-info {
+        flex: 1;
+    }
+
+    .project-name {
+        font-weight: 500;
+        margin-bottom: 2px;
+    }
+
+    .project-status {
+        font-size: 0.8rem;
+    }
+
+    .stat-card {
+        transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    /* Custom scrollbar for projects container */
+    .projects-container::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .projects-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+
+    .projects-container::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 10px;
+    }
+
+    .projects-container::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+
+    .search-container {
+        width: 300px;
+    }
+
+    .search-container .input-group {
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .search-container .input-group-text {
+        border: none;
+        border-right: 1px solid #e9ecef;
+    }
+
+    .search-container .form-control {
+        border: none;
+        padding: 0.5rem 1rem;
+    }
+
+    .search-container .form-control:focus {
+        box-shadow: none;
     }
     </style>
 </body>

@@ -54,11 +54,11 @@ try {
         $max_projects = 0;
         switch ($user['role']) {
             case 'engineer':
-                $max_projects = 2;
+                $max_projects = 3;
                 break;
             case 'technician':
             case 'worker':
-                $max_projects = 1;
+                $max_projects = 2;
                 break;
             default:
                 $max_projects = 0;

@@ -527,6 +527,8 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                             <th>Name</th>
                                             <th>Role</th>
                                             <th>Email</th>
+                                            <th>Projects</th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -540,8 +542,8 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 u.email, 
                                                 u.active_projects,
                                                 CASE 
-                                                    WHEN u.role = 'engineer' THEN 2
-                                                    WHEN u.role IN ('technician', 'worker') THEN 1
+                                                    WHEN u.role = 'engineer' THEN 3
+                                                    WHEN u.role IN ('technician', 'worker') THEN 2
                                                     ELSE 0
                                                 END as max_projects
                                             FROM users u
@@ -588,6 +590,20 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                         <?php echo htmlspecialchars($person['email']); ?>
                                                     </div>
                                                 </td>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="badge bg-info">
+                                                            <?php echo $person['active_projects']; ?> / <?php echo $person['max_projects']; ?> projects
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary view-personnel-projects" 
+                                                            data-personnel-id="<?php echo $person['user_id']; ?>"
+                                                            data-personnel-name="<?php echo htmlspecialchars($person['name']); ?>">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                </td>
                                             </tr>
                                         <?php endforeach; ?>
                                     </tbody>
@@ -609,6 +625,38 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <button type="button" class="btn btn-primary" onclick="confirmProjectAssignment()">
                         <i class="fas fa-check me-2"></i>Create Project & Assign Personnel
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Personnel Projects Modal -->
+    <div class="modal fade" id="personnelProjectsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-project-diagram me-2"></i>
+                        <span id="personnelProjectsTitle">Personnel Projects</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Project Name</th>
+                                    <th>Service</th>
+                                    <th>Status</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="personnelProjectsList">
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -698,6 +746,62 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         document.getElementById('budgetFile').addEventListener('change', function() {
             validateFileType(this, 'Budget file');
+        });
+
+        // Initialize personnel projects modal
+        const personnelProjectsModal = new bootstrap.Modal(document.getElementById('personnelProjectsModal'));
+
+        // Add click handlers for view projects buttons
+        document.querySelectorAll('.view-personnel-projects').forEach(button => {
+            button.addEventListener('click', async function() {
+                const personnelId = this.dataset.personnelId;
+                const personnelName = this.dataset.personnelName;
+                
+                // Update modal title
+                document.getElementById('personnelProjectsTitle').textContent = `${personnelName}'s Projects`;
+                
+                try {
+                    // Fetch personnel's projects
+                    const response = await fetch(`./api/get_personnel_projects.php?personnel_id=${personnelId}`);
+                    const responseText = await response.text();
+                    console.log('Raw response:', responseText); // Debug log
+                    
+                    const data = JSON.parse(responseText);
+                    console.log('Parsed data:', data); // Debug log
+                    
+                    const projectsList = document.getElementById('personnelProjectsList');
+                    projectsList.innerHTML = '';
+                    
+                    if (data.success && data.projects && data.projects.length > 0) {
+                        data.projects.forEach(project => {
+                            console.log('Processing project:', project); // Debug log
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${project.project_name || 'N/A'}</td>
+                                <td>${project.service || 'N/A'}</td>
+                                <td><span class="badge bg-${project.status === 'completed' ? 'success' : 'primary'}">${project.status || 'N/A'}</span></td>
+                                <td>${project.start_date ? new Date(project.start_date).toLocaleDateString() : 'N/A'}</td>
+                                <td>${project.end_date ? new Date(project.end_date).toLocaleDateString() : 'N/A'}</td>
+                            `;
+                            projectsList.appendChild(row);
+                        });
+                    } else {
+                        console.log('No projects found or invalid data structure:', data); // Debug log
+                        projectsList.innerHTML = `
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">
+                                    <i class="fas fa-info-circle me-2"></i>No active projects found
+                                </td>
+                            </tr>
+                        `;
+                    }
+                    
+                    personnelProjectsModal.show();
+                } catch (error) {
+                    console.error('Error fetching personnel projects:', error);
+                    alert('Failed to load personnel projects');
+                }
+            });
         });
     });
 

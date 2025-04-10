@@ -69,6 +69,10 @@ $unread_count = $stmt->fetchColumn();
             <i class="fas fa-users"></i>
             Employee Status
         </a>
+        <a href="clients.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'clients.php' ? 'active' : ''; ?>">
+            <i class="fas fa-user-tie"></i>
+            Clients
+        </a>
         <a href="../logout.php">
             <i class="fas fa-sign-out-alt"></i>
             Logout

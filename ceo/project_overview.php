@@ -36,10 +36,13 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
                     <h5 class="card-title mb-0">
                         <i class="fas fa-project-diagram me-2"></i>Project Overview
                     </h5>
-                    <div class="btn-group">
-                        <button type="button" class="btn btn-outline-primary active" data-filter="all">All</button>
-                        <button type="button" class="btn btn-outline-warning" data-filter="ongoing">Ongoing</button>
-                        <button type="button" class="btn btn-outline-success" data-filter="completed">Completed</button>
+                    <div class="search-container">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white">
+                                <i class="fas fa-search text-muted"></i>
+                            </span>
+                            <input type="text" id="projectSearch" class="form-control" placeholder="Search projects...">
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
@@ -116,20 +119,27 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
     document.addEventListener('DOMContentLoaded', function() {
         loadProjectData();
 
-        // Filter buttons
-        document.querySelectorAll('[data-filter]').forEach(button => {
-            button.addEventListener('click', function() {
-                document.querySelectorAll('[data-filter]').forEach(btn => btn.classList.remove('active'));
-                this.classList.add('active');
-                const filter = this.dataset.filter;
+        // Search functionality
+        const searchInput = document.getElementById('projectSearch');
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            
+            document.querySelectorAll('#projectOverviewTable tr').forEach(row => {
+                const projectName = row.querySelector('td:first-child')?.textContent.toLowerCase() || '';
+                const clientName = row.querySelector('td:nth-child(2)')?.textContent.toLowerCase() || '';
+                const teamMembers = row.querySelector('td:nth-child(3)')?.textContent.toLowerCase() || '';
+                const progress = row.querySelector('td:nth-child(4)')?.textContent.toLowerCase() || '';
+                const deadline = row.querySelector('td:nth-child(5)')?.textContent.toLowerCase() || '';
                 
-                document.querySelectorAll('#projectOverviewTable tr').forEach(row => {
-                    if (filter === 'all' || row.dataset.status === filter) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
+                if (projectName.includes(searchTerm) || 
+                    clientName.includes(searchTerm) || 
+                    teamMembers.includes(searchTerm) || 
+                    progress.includes(searchTerm) || 
+                    deadline.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
             });
         });
     });
@@ -283,6 +293,30 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['role'] !== 'ceo') {
 
     .progress {
         background-color: #e9ecef;
+    }
+
+    .search-container {
+        width: 300px;
+    }
+
+    .search-container .input-group {
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .search-container .input-group-text {
+        border: none;
+        border-right: 1px solid #e9ecef;
+    }
+
+    .search-container .form-control {
+        border: none;
+        padding: 0.5rem 1rem;
+    }
+
+    .search-container .form-control:focus {
+        box-shadow: none;
     }
     </style>
 </body>

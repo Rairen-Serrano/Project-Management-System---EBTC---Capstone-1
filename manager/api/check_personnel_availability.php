@@ -57,8 +57,10 @@ try {
                 $max_projects = 3;
                 break;
             case 'technician':
-            case 'worker':
                 $max_projects = 2;
+                break;
+            case 'worker':
+                $max_projects = 1;
                 break;
             default:
                 $max_projects = 0;

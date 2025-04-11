@@ -543,7 +543,8 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 u.active_projects,
                                                 CASE 
                                                     WHEN u.role = 'engineer' THEN 3
-                                                    WHEN u.role IN ('technician', 'worker') THEN 2
+                                                    WHEN u.role = 'technician' THEN 2
+                                                    WHEN u.role = 'worker' THEN 1
                                                     ELSE 0
                                                 END as max_projects
                                             FROM users u

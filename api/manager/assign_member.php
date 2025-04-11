@@ -42,6 +42,14 @@ try {
     ");
     $stmt->execute([$projectId, $userId]);
 
+    // Update the user's active_projects count
+    $stmt = $pdo->prepare("
+        UPDATE users 
+        SET active_projects = active_projects + 1 
+        WHERE user_id = ?
+    ");
+    $stmt->execute([$userId]);
+
     echo json_encode([
         'success' => true,
         'message' => 'Team member assigned successfully'

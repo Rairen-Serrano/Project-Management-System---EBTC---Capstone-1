@@ -65,6 +65,14 @@ try {
             ");
             $stmt->execute([$data['project_id'], $data['user_id']]);
 
+            // Update the user's active_projects count
+            $stmt = $pdo->prepare("
+                UPDATE users 
+                SET active_projects = active_projects - 1 
+                WHERE user_id = ?
+            ");
+            $stmt->execute([$data['user_id']]);
+
             $pdo->commit();
             echo json_encode(['success' => true, 'message' => 'Team member removed successfully']);
             break;
